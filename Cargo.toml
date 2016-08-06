@@ -1,0 +1,53 @@
+[package]
+name = "mfrc522"
+version = "0.0.0"
+authors = ["emk <rust@emk.one.pl>"]
+license = "MPL-2.0"
+description = "Library for MFRC522 card reader."
+keywords = ["rfid", "mifare", "ntag", "ISO 14443A", "rc522"]
+repository = "https://github.com/emkw/rust-MFRC522.git"
+readme = "README.md"
+publish = false
+
+[features]
+# By default the crate builds as no_std.
+default = []
+
+# Use std instead of core
+use_std = []
+
+# Enable MFRC522 self-test routines.
+# This is disabled by default to save memory on
+# embedded systems.
+self_test = []
+
+# Meta-feature enabling everything.
+all = ["i2cdev", "self_test", "spidev", "use_std"]
+
+[dependencies]
+bitflags = "~0.7.0"
+i2cdev = { version = "~0.3.0", optional = true }
+spidev = { version = "~0.2.1", optional = true }
+
+[dependencies.log]
+version = "~0.3.4"
+default-features = false
+features = ["release_max_level_error"]
+
+[dev-dependencies]
+env_logger = "~0.3.4"
+
+[[example]]
+name = "bus_i2cdev"
+# How to enable crate features for the example?
+# features = ["i2cdev"]
+
+[[example]]
+name = "bus_spidev"
+# How to enable crate features for the example?
+# features = ["spidev"]
+
+[[example]]
+name = "dump_info"
+# How to enable crate features for the example?
+# features = ["spidev", "self_test"]
