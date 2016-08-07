@@ -620,6 +620,40 @@ impl<'a> MFRC522<'a> {
 	}
 
 	/**
+	 * Transmits a Halt command, Type A. Instructs a PICC in state ACTIVE(*) to go to state HALT.
+	 **/
+	pub fn picc_hlta(&mut self) -> Status {
+		let mut tx_buffer = [0; 4];
+		tx_buffer[0] = picc::Cmd::HLTA as u8;
+
+		// Calculate CRC_A
+		// TODO: Investigate if const CRC can be used, or if it must follow the
+		//       CRC preset set in mfrc522 register.
+		let crc_status = {
+			let (data, crc_buffer) = tx_buffer.split_at_mut(2);
+
+			self.crc_calculate(data, crc_buffer)
+		};
+		if crc_status != Status::Ok {
+			return crc_status;
+		}
+
+		// Send the command.
+		// The standard says:
+		//   If the PICC responds with any modulation during a period of 1 ms after the end of the frame containing the
+		//   HLTA command, this response shall be interpreted as 'not acknowledge'.
+		// We interpret that this way: Only STATUS_TIMEOUT is a success.
+		let (status, _) = self.pcd_transceive_data(tx_buffer.as_ref(), None, &mut 0_u8, 0, false);
+		if status == Status::Timeout {
+			return Status::Ok;
+		} else if status == Status::Ok { // That is ironically NOT ok in this case ;-)
+			return Status::Error;
+		}
+
+		return status;
+	}
+
+	/**
 	 * Transmits REQA or WUPA commands.
 	 *
 	 * Beware: When two PICCs are in the field at the same time it often yields Error::Timeout - probably due do bad antenna design.

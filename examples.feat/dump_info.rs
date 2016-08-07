@@ -38,12 +38,14 @@ fn example() -> io::Result<()> {
 	loop {
 		let new_card = mfrc522.picc_is_new_card_present();
 		if new_card {
-			println!("Card detected.");
+			println!("New card detected.");
 
 			let status = mfrc522.picc_select(&mut uid);
 			println!("Select: {:?} {:?}", status, uid);
 			if status == Status::Ok {
 				println!("Card UID: {:?}", uid.as_bytes());
+				let halt_status = mfrc522.picc_hlta();
+				println!("Halt: {:?}", halt_status);
 			}
 
 			uid.clear();
