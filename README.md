@@ -27,7 +27,7 @@ features = ["spidev", "self_test"]
 ```
 
 ### Code:
-Please see code in `examples` directory.
+Please see code in `examples.feat` directory.
 
 ## License
 

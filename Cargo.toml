@@ -13,8 +13,11 @@ publish = false
 # By default the crate builds as no_std.
 default = []
 
-# Use std instead of core
+# Compile without no_std.
 use_std = []
+
+# Calculate CRC_A on host rather than on PCD.
+host_crc = []
 
 # Enable MFRC522 self-test routines.
 # This is disabled by default to save memory on
@@ -22,7 +25,7 @@ use_std = []
 self_test = []
 
 # Meta-feature enabling everything.
-all = ["i2cdev", "self_test", "spidev", "use_std"]
+all = ["host_crc", "i2cdev", "self_test", "spidev", "use_std"]
 
 [dependencies]
 bitflags = "~0.7.0"
@@ -37,17 +40,17 @@ features = ["release_max_level_error"]
 [dev-dependencies]
 env_logger = "~0.3.4"
 
-[[example]]
-name = "bus_i2cdev"
+#[[example]]
+#name = "bus_i2cdev"
 # How to enable crate features for the example?
 # features = ["i2cdev"]
 
-[[example]]
-name = "bus_spidev"
+#[[example]]
+#name = "bus_spidev"
 # How to enable crate features for the example?
 # features = ["spidev"]
 
-[[example]]
-name = "dump_info"
+#[[example]]
+#name = "dump_info"
 # How to enable crate features for the example?
 # features = ["spidev", "self_test"]

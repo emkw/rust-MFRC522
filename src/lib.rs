@@ -27,9 +27,11 @@ extern crate i2cdev;
 #[cfg(feature = "spidev")]
 extern crate spidev;
 
-pub mod bus;
 #[cfg(feature = "self_test")]
 pub mod self_test;
+
+pub mod bus;
+pub mod host;
 pub mod pcd;
 pub mod picc;
 
@@ -645,12 +647,20 @@ impl<'a> MFRC522<'a> {
 	/**
 	 * Calculate CRC.
 	 *
-	 * In the future this will be a wrapper for `host_crc_calculate()` / `pcd_crc_calculate()`,
-	 * selected at compile-time.
+	 * Calculates CRC_A, on host or on PCD, controlled at compile-time with
+	 * feature `host_crc`.
 	 **/
 	#[inline]
 	pub fn crc_calculate(&mut self, data: &[u8], output: &mut [u8]) -> Status {
-		let status = self.pcd_crc_calculate(data, output);
+		let status = if cfg!(feature = "host_crc") {
+			let crc = host::crc::crc_iso14443a(data);
+			output[0] = crc as u8;
+			output[1] = (crc >> 8) as u8;
+
+			Status::Ok
+		} else {
+			self.pcd_crc_calculate(data, output)
+		};
 		debug!("crc_calculate(): {:?}: {:?} -> {:?}", status, data, &output[0..2]);
 
 		status
