@@ -7,7 +7,7 @@ use std::path::Path;
 
 use spidev::{Spidev, SpidevOptions,SPI_MODE_0};
 use mfrc522::MFRC522;
-use mfrc522::pcd::reg::Reg;
+use mfrc522::pcd::Reg;
 
 pub fn spi_open<P: AsRef<Path>>(path: P) -> io::Result<Spidev> {
 	let mut options = SpidevOptions::new();

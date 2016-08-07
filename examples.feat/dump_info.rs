@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use mfrc522::MFRC522;
 use mfrc522::Status;
-use mfrc522::pcd::reg::Reg;
+use mfrc522::pcd::Reg;
 
 fn example() -> io::Result<()> {
 	let mut bus = try!(spi_open("/dev/spidev0.0"));

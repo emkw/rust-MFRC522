@@ -7,6 +7,8 @@
 
 pub mod reg;
 
+pub use self::reg::Reg;
+
 /// MFRC522 commands. Described in chapter 10 of the datasheet.
 #[derive(Copy,Clone,Debug,Eq,PartialEq)]
 #[repr(u8)]
@@ -61,5 +63,3 @@ pub enum RxGain {
 pub const RXGAIN_MIN: RxGain = RxGain::Gain18dB;
 pub const RXGAIN_AVG: RxGain = RxGain::Gain33dB;
 pub const RXGAIN_MAX: RxGain = RxGain::Gain48dB;
-
-

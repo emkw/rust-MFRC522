@@ -152,6 +152,14 @@ pub enum Reg {
 	//                    0x3F
 }
 
+pub mod bits {
+	//! Re-exports of all defined registers bits.
+
+	pub use super::ComIrq::*;
+	pub use super::Error::*;
+	pub use super::TxControl::*;
+}
+
 #[allow(non_snake_case)]
 #[allow(non_upper_case_globals)]
 pub mod ComIrq {
@@ -159,7 +167,7 @@ pub mod ComIrq {
 
 	bitflags! {
 		/// Bitflags for ComIrqReg (0x04) bits.
-		pub flags Bits: u8 {
+		pub flags ComIrqBits: u8 {
 			const Set1           = 1 << 7,
 			const TxIRq          = 1 << 6,
 			const RxIRq          = 1 << 5,
@@ -179,7 +187,7 @@ pub mod Error {
 
 	bitflags! {
 		/// Bitflags for ErrorReg (0x06) bits.
-		pub flags Bits: u8 {
+		pub flags ErrorBits: u8 {
 			/// Data written into the FIFO buffer by the host during the MFAuthent
 			/// command or if during the time between sending and receiving the last
 			/// bit on the RF interface.
@@ -209,7 +217,7 @@ pub mod TxControl {
 
 	bitflags! {
 		/// Bitflags for TxControlReg (0x14) bits.
-		pub flags Bits: u8 {
+		pub flags TxControlBits: u8 {
 			/// Output signal on pin TX2 inverted when driver TX2 is enabled
 			const InvTx2RFOn     = 1 << 7,
 			/// Output signal on pin TX1 inverted when driver TX1 is enabled
@@ -218,7 +226,7 @@ pub mod TxControl {
 			const InvTx2RFOff    = 1 << 5,
 			const Tx2CW          = 1 << 3,
 			/// TxControlReg bit 2 reserved for future use.
-			const _bit_14_2          = 1 << 2,
+			const _bit_14_2      = 1 << 2,
 			const Tx2RFEn        = 1 << 1,
 			const Tx1RFEn        = 1 << 0,
 		}

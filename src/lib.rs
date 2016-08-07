@@ -39,8 +39,8 @@ use core::ops::Div;
 use core::ops::Mul;
 
 use bus::MFRC522Bus;
-use pcd::reg::{self,Reg};
-use pcd::reg::Error::*;
+use pcd::reg::Reg;
+use pcd::reg::bits::*;
 use picc::Uid;
 
 pub struct MFRC522<'a> {
@@ -108,10 +108,10 @@ impl<'a> MFRC522<'a> {
 	 * Returns bits from ErrorReg.
 	 **/
 	#[inline]
-	pub fn pcd_error(&mut self) -> reg::Error::Bits {
+	pub fn pcd_error(&mut self) -> ErrorBits {
 		let error_reg_value = self.register_read(Reg::Error);
 
-		reg::Error::Bits::from_bits_truncate(error_reg_value)
+		ErrorBits::from_bits_truncate(error_reg_value)
 	}
 
 	/**
