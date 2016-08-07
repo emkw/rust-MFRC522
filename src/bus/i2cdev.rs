@@ -4,16 +4,16 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 //! This is not tested at all. Would appricciate testing & bug feedback.
+//!
+//! WARNING: It conflicts with Spidev implementation so only one of
+//! `spidev` `i2cdev` features may be selected.
 
 use i2cdev::core::I2CDevice;
 
 use bus::MFRC522Bus;
 use pcd;
 
-impl<B> MFRC522Bus for B where B: I2CDevice
-{
-
-
+impl<B: I2CDevice> MFRC522Bus for B {
 	fn register_read(&mut self, reg: pcd::Reg) -> u8 {
 		self.smbus_read_byte_data(reg as u8).unwrap()
 	}

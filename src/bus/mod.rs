@@ -16,7 +16,6 @@ pub mod spidev;
 
 use pcd;
 
-
 pub trait MFRC522Bus {
 	/// Read single byte from MFRC522 register.
 	fn register_read(&mut self, reg: pcd::Reg) -> u8;
@@ -80,5 +79,3 @@ pub enum Mode {
 pub fn spi_reg_addr(reg: pcd::Reg, mode: Mode) -> u8 {
 	mode as u8 | ((reg as u8) << 1)
 }
-
-
