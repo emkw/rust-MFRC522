@@ -14,17 +14,17 @@ pub mod i2cdev;
 #[cfg(feature = "spidev")]
 pub mod spidev;
 
-use pcd;
+use pcd::reg::Reg;
 
 pub trait MFRC522Bus {
 	/// Read single byte from MFRC522 register.
-	fn register_read(&mut self, reg: pcd::Reg) -> u8;
+	fn register_read(&mut self, reg: Reg) -> u8;
 	/// Write single byte to MFRC522 register.
-	fn register_write(&mut self, reg: pcd::Reg, value: u8);
+	fn register_write(&mut self, reg: Reg, value: u8);
 
 	#[inline]
 	/// Write multiple bytes to a single MFRC522 register.
-	fn register_write_slice(&mut self, reg: pcd::Reg, values: &[u8]) {
+	fn register_write_slice(&mut self, reg: Reg, values: &[u8]) {
 		for byte in values {
 			self.register_write(reg, *byte);
 		}
@@ -32,7 +32,7 @@ pub trait MFRC522Bus {
 
 	#[inline]
 	/// Read multiple bytes from a single MFRC522 register.
-	fn register_read_to_slice(&mut self, reg: pcd::Reg, buf: &mut [u8]) {
+	fn register_read_to_slice(&mut self, reg: Reg, buf: &mut [u8]) {
 		for b in buf {
 			*b = self.register_read(reg);
 		}
@@ -40,7 +40,7 @@ pub trait MFRC522Bus {
 
 	/// Read multiple bytes from a single MFRC522 register,
 	/// only partialy overwriting the first buffer byte.
-	fn register_read_to_slice_align(&mut self, reg: pcd::Reg, buf: &mut [u8], rx_align: u8) {
+	fn register_read_to_slice_align(&mut self, reg: Reg, buf: &mut [u8], rx_align: u8) {
 		if buf.len() > 0 {
 			let buf_tail = if rx_align != 0 {
 				let (buf_head, buf_tail) = buf.split_at_mut(1);
@@ -76,6 +76,6 @@ pub enum Mode {
 ///
 ///  When using SPI all addresses are shifted one bit left in the "SPI address byte" (section 8.1.2.3).
 #[inline]
-pub fn spi_reg_addr(reg: pcd::Reg, mode: Mode) -> u8 {
+pub fn spi_reg_addr(reg: Reg, mode: Mode) -> u8 {
 	mode as u8 | ((reg as u8) << 1)
 }

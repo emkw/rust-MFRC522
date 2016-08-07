@@ -39,7 +39,8 @@ use core::ops::Div;
 use core::ops::Mul;
 
 use bus::MFRC522Bus;
-use pcd::Reg;
+use pcd::reg::{self,Reg};
+use pcd::reg::Error::*;
 use picc::Uid;
 
 pub struct MFRC522<'a> {
@@ -47,6 +48,9 @@ pub struct MFRC522<'a> {
 }
 
 impl<'a> MFRC522<'a> {
+	/**
+	 * Returns new MFRC522 structure, without performing any PCD initialization nor reset.
+	 **/
 	#[inline]
 	pub fn uninitialized(bus: &'a mut MFRC522Bus) -> Self {
 		MFRC522 {
@@ -55,7 +59,7 @@ impl<'a> MFRC522<'a> {
 	}
 
 	/**
-	 * Initializes the MFRC522 chip.
+	 * Performs soft reset & initialization and returns new MFRC522 structure.
 	 **/
 	pub fn init(bus: &'a mut MFRC522Bus) -> Self {
 		let mut mfrc522 = Self::uninitialized(bus);
@@ -65,6 +69,9 @@ impl<'a> MFRC522<'a> {
 		mfrc522
 	}
 
+	/**
+	 * Initializes the MFRC522 chip.
+	 **/
 	pub fn pcd_init(&mut self) {
 		// When communicating with a PICC we need a timeout if something goes wrong.
 		// f_timer = 13.56 MHz / (2*TPreScaler+1) where TPreScaler = [TPrescaler_Hi:TPrescaler_Lo].
@@ -95,6 +102,16 @@ impl<'a> MFRC522<'a> {
 	#[inline]
 	pub fn pcd_soft_reset(&mut self) {
 		self.pcd_command(pcd::Cmd::SoftReset);
+	}
+
+	/**
+	 * Returns bits from ErrorReg.
+	 **/
+	#[inline]
+	pub fn pcd_error(&mut self) -> reg::Error::Bits {
+		let error_reg_value = self.register_read(Reg::Error);
+
+		reg::Error::Bits::from_bits_truncate(error_reg_value)
 	}
 
 	/**
@@ -245,10 +262,8 @@ impl<'a> MFRC522<'a> {
 		}
 	
 		// Stop now if any errors except collisions were detected.
-		// ErrorReg[7..0] bits are: WrErr TempErr reserved BufferOvfl CollErr CRCErr ParityErr ProtocolErr
-		let error_reg_value = self.register_read(Reg::Error);
-		// BufferOvfl ParityErr ProtocolErr
-		if error_reg_value & 0x13 != 0 {
+		let error = self.pcd_error();
+		if error.contains(BufferOvfl | ParityErr | ProtocolErr) {
 			return (Status::Error, 0);
 		}
 
@@ -269,8 +284,7 @@ impl<'a> MFRC522<'a> {
 			debug!("RX |{}.{}|: {:?}.", n, *last_bits, recv);
 
 			// Tell about collisions
-			// CollErr
-			if error_reg_value & 0x08 != 0 {
+			if error.contains(CollErr) {
 				return (Status::Collision, nread);
 			}
 

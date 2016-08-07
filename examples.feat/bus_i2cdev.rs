@@ -4,7 +4,7 @@ extern crate mfrc522;
 
 use i2cdev::linux::{LinuxI2CDevice, LinuxI2CError};
 use mfrc522::MFRC522;
-use mfrc522::pcd::Reg;
+use mfrc522::pcd::reg::Reg;
 
 fn example() -> Result<(), LinuxI2CError> {
 	let mut bus = try!(LinuxI2CDevice::new("/dev/i2c-1", 0));

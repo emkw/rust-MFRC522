@@ -10,7 +10,8 @@
 //! Provides `self_test()` method for MFRC522.
 
 use MFRC522;
-use pcd::{Cmd,Reg};
+use pcd::Cmd;
+use pcd::reg::Reg;
 
 impl<'a> MFRC522<'a> {
 	/**

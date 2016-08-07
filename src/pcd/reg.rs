@@ -3,7 +3,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
-//! Definitions for interfacing the *PCD* (Proximity Coupling Device): NXP MFRC522 Contactless Reader IC.
+//! MFRC522 registers and named bits.
+//!
+//! Refer to MFRC522 datasheet for detailed description.
 
 /// MFRC522 registers. Described in chapter 9 of the datasheet.
 ///
@@ -150,70 +152,14 @@ pub enum Reg {
 	//                    0x3F
 }
 
-/// MFRC522 commands. Described in chapter 10 of the datasheet.
-#[derive(Copy,Clone,Debug,Eq,PartialEq)]
-#[repr(u8)]
-pub enum Cmd {
-	/// No action, cancels current command execution.
-	Idle                = 0x00,
-	/// Stores 25 bytes into the internal buffer.
-	Mem                 = 0x01,
-	/// Generates a 10-byte random ID number.
-	GenerateRandomID    = 0x02,
-	/// Activates the CRC coprocessor or performs a self test.
-	CalcCRC             = 0x03,
-	/// Transmits data from the FIFO buffer.
-	Transmit            = 0x04,
-	/// No command change, can be used to modify the CommandReg register bits without affecting the command, for example the PowerDown bit.
-	NoCmdChange         = 0x07,
-	/// Activates the receiver circuits.
-	Receive             = 0x08,
-	/// Transmits data from FIFO buffer to antenna and automatically activates the receiver after transmission.
-	Transceive          = 0x0C,
-	/// Performs the MIFARE standard authentication as a reader.
-	MFAuthent           = 0x0E,
-	/// Resets the MFRC522.
-	SoftReset           = 0x0F
-}
-
-/// MFRC522 RxGain[2:0] masks, defines the receiver's signal voltage gain factor (on the PCD).
-/// www.nxp.com/documents/data_sheet/MFRC522.pdf
-/// Described in 9.3.3.6 / table 98 of the datasheet at http:
-#[allow(non_camel_case_types)]
-#[derive(Copy,Clone,Debug)]
-#[repr(u8)]
-pub enum RxGain {
-	/// 000b - 18 dB, minimum.
-	Gain18dB            = 0x00 << 4,
-	/// 001b - 23 dB.
-	Gain23dB            = 0x01 << 4,
-	/// 010b - 18 dB, it seems 010b is a duplicate for 000b.
-	Gain18dB_2          = 0x02 << 4,
-	/// 011b - 23 dB, it seems 011b is a duplicate for 001b.
-	Gain23dB_2          = 0x03 << 4,
-	/// 100b - 33 dB, average, and typical default.
-	Gain33dB            = 0x04 << 4,
-	/// 101b - 38 dB.
-	Gain38dB            = 0x05 << 4,
-	/// 110b - 43 dB.
-	Gain43dB            = 0x06 << 4,
-	/// 111b - 48 dB, maximum.
-	Gain48dB            = 0x07 << 4,
-}
-
-pub const RXGAIN_MIN: RxGain = RxGain::Gain18dB;
-pub const RXGAIN_AVG: RxGain = RxGain::Gain33dB;
-pub const RXGAIN_MAX: RxGain = RxGain::Gain48dB;
-
-// To be decided
-#[cfg(disabled)]
-pub mod reg {
-#![allow(non_upper_case_globals)]
-//! Named bits in MFRC522 registers.
+#[allow(non_snake_case)]
+#[allow(non_upper_case_globals)]
+pub mod ComIrq {
+	//! ComIrqReg (0x04) bits.
 
 	bitflags! {
-		/// ComIrqReg (0x04) bits.
-		pub flags ComIrqReg: u8 {
+		/// Bitflags for ComIrqReg (0x04) bits.
+		pub flags Bits: u8 {
 			const Set1           = 1 << 7,
 			const TxIRq          = 1 << 6,
 			const RxIRq          = 1 << 5,
@@ -224,19 +170,55 @@ pub mod reg {
 			const TimerIRq       = 1 << 0,
 		}
 	}
+}
+
+#[allow(non_snake_case)]
+#[allow(non_upper_case_globals)]
+pub mod Error {
+	//! ErrorReg (0x06) bits.
 
 	bitflags! {
-		/// TxControlReg (0x14) bits.
-		pub flags TxControlReg: u8 {
-			#[doc = "output signal on pin TX2 inverted when driver TX2 is enabled"]
+		/// Bitflags for ErrorReg (0x06) bits.
+		pub flags Bits: u8 {
+			/// Data written into the FIFO buffer by the host during the MFAuthent
+			/// command or if during the time between sending and receiving the last
+			/// bit on the RF interface.
+			const WrErr          = 1 << 7,
+			/// Internal temperature sensor detects overheating.
+			const TempErr        = 1 << 6,
+			/// ErrorReg bit 5 reserved for future use.
+			const _bit_06_5      = 1 << 5,
+			/// Trying to write data to the FIFO buffer even though it is already full.
+			const BufferOvfl     = 1 << 4,
+			/// A bit-collision is detected.
+			const CollErr        = 1 << 3,
+			/// The RxModeReg register's RxCRCEn bit is set and the CRC calculation fails.
+			const CRCErr         = 1 << 2,
+			/// Parity check failed.
+			const ParityErr      = 1 << 1,
+			/// Set to logic 1 if the SOF (Start Of Frame) is incorrect.
+			const ProtocolErr    = 1 << 0,
+		}
+	}
+}
+
+#[allow(non_snake_case)]
+#[allow(non_upper_case_globals)]
+pub mod TxControl {
+	//! TxControlReg (0x14) bits.
+
+	bitflags! {
+		/// Bitflags for TxControlReg (0x14) bits.
+		pub flags Bits: u8 {
+			/// Output signal on pin TX2 inverted when driver TX2 is enabled
 			const InvTx2RFOn     = 1 << 7,
-			#[doc = "output signal on pin TX1 inverted when driver TX1 is enabled"]
+			/// Output signal on pin TX1 inverted when driver TX1 is enabled
 			const InvTx1RFOn     = 1 << 6,
-			#[doc = "output signal on pin TX2 inverted when driver TX2 is disabled"]
+			/// Output signal on pin TX2 inverted when driver TX2 is disabled
 			const InvTx2RFOff    = 1 << 5,
 			const Tx2CW          = 1 << 3,
-			// Bit 2 reserved for future use.
-			const _14_Reserved_2 = 1 << 2,
+			/// TxControlReg bit 2 reserved for future use.
+			const _bit_14_2          = 1 << 2,
 			const Tx2RFEn        = 1 << 1,
 			const Tx1RFEn        = 1 << 0,
 		}

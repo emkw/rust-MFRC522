@@ -16,11 +16,11 @@ use spidev::Spidev;
 use bus;
 use bus::MFRC522Bus;
 
-use pcd;
+use pcd::reg::Reg;
 
 impl MFRC522Bus for Spidev {
 	#[inline]
-	fn register_read(&mut self, reg: pcd::Reg) -> u8 {
+	fn register_read(&mut self, reg: Reg) -> u8 {
 		let reg_addr = bus::spi_reg_addr(reg, bus::Mode::Read);
 		let mut rx_buf: [u8; 1] = [0];
 		self.write(&[reg_addr]).unwrap();
@@ -31,13 +31,13 @@ impl MFRC522Bus for Spidev {
 	}
 
 	#[inline]
-	fn register_write(&mut self, reg: pcd::Reg, value: u8) {
+	fn register_write(&mut self, reg: Reg, value: u8) {
 		let reg_addr = bus::spi_reg_addr(reg, bus::Mode::Write);
 		trace!("{:?}/{:02x} <- {:02x}", reg, reg_addr, value);
 		self.write(&[reg_addr, value]).unwrap();
 	}
 
-	fn register_write_slice(&mut self, reg: pcd::Reg, values: &[u8]) {
+	fn register_write_slice(&mut self, reg: Reg, values: &[u8]) {
 		let reg_addr = bus::spi_reg_addr(reg, bus::Mode::Write);
 		let mut tx_buf = Vec::with_capacity(values.len() + 1);
 		tx_buf.push(reg_addr);
