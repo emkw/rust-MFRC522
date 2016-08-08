@@ -1,6 +1,6 @@
 # MFRC522
 
-Library for MFRC522 card reader.  
+Rust library for MFRC522 card reader.  
 This is (an incomplete) attempt to port C++ MFRC522 library by COOQROBOT et. al.
 
 This is still Work in Progress. API is highly unstable at the moment.  
@@ -25,6 +25,17 @@ i2cdev bus untested, there's a chance it may work.
 git = "https://github.com/emkw/rust-MFRC522.git"
 features = ["spidev", "self_test"]
 ```
+
+### Cargo.toml features:
+- `use_std` - compile without `no_std`.
+
+
+- `host_crc` - calculate CRC_A on host rather than on PCD.
+- `self_test` - provide MFRC522 self-test routine.
+
+
+- `i2cdev` - provide i2cdev communication. This conflicts with `spidev`.
+- `spidev` - provide spidev communication. This conflicts with `i2cdev`.
 
 ### Code:
 Please see code in `examples.feat` directory.

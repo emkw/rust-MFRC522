@@ -19,7 +19,7 @@ use_std = []
 # Calculate CRC_A on host rather than on PCD.
 host_crc = []
 
-# Enable MFRC522 self-test routines.
+# Provide MFRC522 self-test routine.
 # This is disabled by default to save memory on
 # embedded systems.
 self_test = []
