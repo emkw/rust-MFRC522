@@ -106,6 +106,8 @@ impl<'a> MFRC522<'a> {
 
 	/**
 	 * Returns bits from ErrorReg.
+	 *
+	 * ErrorReg[7..0] bits are: WrErr TempErr (reserved)_bit_06_5 BufferOvfl CollErr CRCErr ParityErr ProtocolErr
 	 **/
 	#[inline]
 	pub fn pcd_error(&mut self) -> ErrorBits {
@@ -147,9 +149,7 @@ impl<'a> MFRC522<'a> {
 	 * Use the CRC coprocessor in the MFRC522 to calculate a CRC_A.
 	 **/
 	#[inline]
-	pub fn pcd_crc_calculate(&mut self, data: &[u8], output: &mut [u8]) -> Status {
-		debug_assert!(output.len() >= 2);
-
+	pub fn pcd_crc_calculate(&mut self, data: &[u8]) -> Result<u16, Status> {
 		// Stop any active command.
 		self.pcd_command(pcd::Cmd::Idle);
 		// Request the CRCIRq interrupt bit.
@@ -174,17 +174,18 @@ impl<'a> MFRC522<'a> {
 			if i == 0 {
 				// The emergency break. We will eventually terminate on this one after some time.
 				// Communication with the MFRC522 might be down.
-				return Status::Timeout;
+				return Err(Status::Timeout);
 			}
 		}
 		// Stop calculating CRC for new content in the FIFO.
 		self.pcd_command(pcd::Cmd::Idle);
-		// Transfer the result from the registers to the result buffer
-		output[0] = self.register_read(Reg::CRCResultL);
-		output[1] = self.register_read(Reg::CRCResultH);
 
-		// unimplemented
-		Status::Ok
+		// Transfer the result from the registers and compose u16.
+		let crc_lo = self.register_read(Reg::CRCResultL);
+		let crc_hi = self.register_read(Reg::CRCResultH);
+		let crc = (crc_hi as u16) << 8 | crc_lo as u16;
+
+		Ok(crc)
 	}
 
 	#[inline]
@@ -299,14 +300,13 @@ impl<'a> MFRC522<'a> {
 					return (Status::CRCError, nread);
 				}
 				// Verify CRC_A - do our own calculation and store the it in crc_buffer.
-				let mut crc_buffer: [u8; 2] = [0; 2];
-				let status = self.crc_calculate(&recv[..recv.len()-2], &mut crc_buffer[..]);
-				if status != Status::Ok {
-					return (status, nread);
-				}
-
-				if recv[recv.len()-2] != crc_buffer[0] || recv[recv.len()-1] != crc_buffer[1] {
-					return (Status::CRCError, nread);
+				let crc = self.crc_calculate(&recv[..recv.len()-2]);
+				if let Err(crc_fail) = crc {
+					return (crc_fail, nread);
+				} else if let Ok(crc) = crc {
+					if !Self::u16_le_eq(&recv[recv.len()-2..], crc) {
+						return (Status::CRCError, nread);
+					}
 				}
 			}
 		}
@@ -479,10 +479,13 @@ impl<'a> MFRC522<'a> {
 
 					// Calculate CRC_A of first 7 bytes in tx_buffer.
 					// and write them to last 2 bytes.
-					let (crc_data, crc_result) = tx_buffer.split_at_mut(7);
-					let result = self.crc_calculate(crc_data, crc_result);
-					if result != Status::Ok {
-						return result;
+					let (crc_data, crc_out) = tx_buffer.split_at_mut(7);
+					let crc = self.crc_calculate(crc_data);
+					if let Err(crc_fail) = crc {
+						return crc_fail;
+					} else if let Ok(crc) = crc {
+						crc_out[0] = crc as u8;
+						crc_out[1] = (crc >> 8) as u8;
 					}
 
 					// lest bits = 0 => All 8 bits of last bit are used.
@@ -592,11 +595,13 @@ impl<'a> MFRC522<'a> {
 
 			// Verify CRC_A
 			// do our own calculation and store the control in tx_buffer[0..2] - those bytes are not needed anymore.
-			let result = self.crc_calculate(&rx_buffer[0..1], &mut tx_buffer[0..2]);
-			if result != Status::Ok {
-				return result;
-			} else if tx_buffer[0] != rx_buffer[1] || tx_buffer[1] != rx_buffer[2] {
-				return Status::CRCError;
+			let crc = self.crc_calculate(&rx_buffer[0..1]);
+			if let Err(crc_fail) = crc {
+				return crc_fail;
+			} else if let Ok(crc) = crc {
+				if !Self::u16_le_eq(&rx_buffer[1..], crc) {
+					return Status::CRCError;
+				}
 			}
 
 			if rx_buffer[0] & 0x04 != 0 { // Cascade bit set - UID not complete yet
@@ -643,13 +648,16 @@ impl<'a> MFRC522<'a> {
 		// Calculate CRC_A
 		// TODO: Investigate if const CRC can be used, or if it must follow the
 		//       CRC preset set in mfrc522 register.
-		let crc_status = {
+		{
 			let (data, crc_buffer) = tx_buffer.split_at_mut(2);
 
-			self.crc_calculate(data, crc_buffer)
-		};
-		if crc_status != Status::Ok {
-			return crc_status;
+			let crc = self.crc_calculate(data);
+			if let Err(crc_fail) = crc {
+				return crc_fail;
+			} else if let Ok(crc) = crc {
+				crc_buffer[0] = crc as u8;
+				crc_buffer[1] = (crc >> 8) as u8;
+			}
 		}
 
 		// Send the command.
@@ -699,19 +707,27 @@ impl<'a> MFRC522<'a> {
 	 * feature `host_crc`.
 	 **/
 	#[inline]
-	pub fn crc_calculate(&mut self, data: &[u8], output: &mut [u8]) -> Status {
-		let status = if cfg!(feature = "host_crc") {
+	pub fn crc_calculate(&mut self, data: &[u8]) -> Result<u16, Status> {
+		let ret = if cfg!(feature = "host_crc") {
 			let crc = host::crc::crc_iso14443a(data);
-			output[0] = crc as u8;
-			output[1] = (crc >> 8) as u8;
 
-			Status::Ok
+			Ok(crc)
 		} else {
-			self.pcd_crc_calculate(data, output)
+			self.pcd_crc_calculate(data)
 		};
-		debug!("crc_calculate(): {:?}: {:?} -> {:?}", status, data, &output[0..2]);
+		debug!("crc_calculate(): {:?} -> {:?}", data, ret);
 
-		status
+		ret
+	}
+
+	/**
+	 * Check if little endian bytes match u16.
+	 *
+	 * Used mainly for crc checks.
+	 **/
+	#[inline]
+	pub fn u16_le_eq(bytes: &[u8], value: u16) -> bool {
+		bytes[0] == value as u8 && bytes[1] == (value >> 8) as u8
 	}
 
 	/**
