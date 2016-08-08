@@ -41,7 +41,7 @@ use core::ops::Mul;
 use bus::MFRC522Bus;
 use pcd::reg::Reg;
 use pcd::reg::bits::*;
-use picc::Uid;
+use picc::uid::UID;
 
 pub struct MFRC522<'a> {
 	bus: &'a mut MFRC522Bus,
@@ -373,7 +373,7 @@ impl<'a> MFRC522<'a> {
 	 *         triple      10                         3                     Not currently in use?
 	 *
 	 **/
-	pub fn picc_select(&mut self, uid: &mut Uid) -> Status {
+	pub fn picc_select(&mut self, uid: &mut UID) -> Status {
 		// Description of TX buffer structure:
 		// Byte 0: SEL              Indicates the Cascade Level: SEL_CL1, SEL_CL2 or SEL_CL3
 		// Byte 1: NVB              Number of Valid Bits (in complete command, not just the UID): High nibble: complete bytes, Low nibble: Extra bits.

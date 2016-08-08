@@ -34,7 +34,7 @@ fn example() -> io::Result<()> {
 	mfrc522.pcd_soft_reset();
 	mfrc522.pcd_init();
 
-	let mut uid = mfrc522::picc::Uid::default();
+	let mut uid = mfrc522::picc::UID::default();
 	loop {
 		let new_card = mfrc522.picc_is_new_card_present();
 		if new_card {
