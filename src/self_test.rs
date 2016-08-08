@@ -12,6 +12,7 @@
 use MFRC522;
 use pcd::Cmd;
 use pcd::reg::Reg;
+use pcd::reg::bits::*;
 
 impl<'a> MFRC522<'a> {
 	/**
@@ -43,10 +44,9 @@ impl<'a> MFRC522<'a> {
 
 		// 6. Wait for self-test to complete.
 		for _ in 0..0xFF {
-			// DivIrqReg[7..0] bits are: Set2 reserved reserved MfinActIRq reserved CRCIRq reserved reserved.
-			let n = self.register_read(Reg::DivIrq);
-			// CRCIRq bit set - calculation done
-			if n & 0x04 != 0 {
+			let divirq = self.reg_divirq();
+			// CRCIRq bit is set <=> calculation done.
+			if divirq.intersects(CRCIRq) {
 				break;
 			}
 		}

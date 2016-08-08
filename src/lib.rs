@@ -105,15 +105,47 @@ impl<'a> MFRC522<'a> {
 	}
 
 	/**
+	 * Start a command execution on PCD by writing to CommandReg.
+	 **/
+	#[inline]
+	pub fn pcd_command(&mut self, command: pcd::Cmd) {
+		self.register_write(Reg::Command, command as u8)
+	}
+
+	/**
 	 * Returns bits from ErrorReg.
 	 *
 	 * ErrorReg[7..0] bits are: WrErr TempErr (reserved)_bit_06_5 BufferOvfl CollErr CRCErr ParityErr ProtocolErr
 	 **/
 	#[inline]
-	pub fn pcd_error(&mut self) -> ErrorBits {
-		let error_reg_value = self.register_read(Reg::Error);
+	pub fn reg_error(&mut self) -> ErrorBits {
+		let bits = self.register_read(Reg::Error);
 
-		ErrorBits::from_bits_truncate(error_reg_value)
+		ErrorBits::from_bits_truncate(bits)
+	}
+
+	/**
+	 * Returns bits from ComIrqReg.
+	 *
+	 * ComIrqReg[7..0] bits are: Set1 TxIRq RxIRq IdleIRq HiAlertIRq LoAlertIRq ErrIRq TimerIRq
+	 **/
+	#[inline]
+	pub fn reg_comirq(&mut self) -> ComIrqBits {
+		let bits = self.register_read(Reg::ComIrq);
+
+		ComIrqBits::from_bits_truncate(bits)
+	}
+
+	/**
+	 * Returns bits from DivIrqReg.
+	 *
+	 * DivIrqReg[7..0] bits are: Set2 (reserved)_bit_05_[65] MfinActIRq (reserved)_bit_05_3 CRCIRq (reserved)_bit_05_[10]
+	 **/
+	#[inline]
+	pub fn reg_divirq(&mut self) -> DivIrqBits {
+		let bits = self.register_read(Reg::DivIrq);
+
+		DivIrqBits::from_bits_truncate(bits)
 	}
 
 	/**
@@ -122,7 +154,8 @@ impl<'a> MFRC522<'a> {
 	 **/
 	#[inline]
 	pub fn pcd_transmitter_on(&mut self) {
-		self.register_set_bit_mask(Reg::TxControl, 0x03);
+		let mask = Tx1RFEn | Tx2RFEn;
+		self.register_set_bit_mask(Reg::TxControl, mask.bits());
 	}
 
 	/**
@@ -130,7 +163,8 @@ impl<'a> MFRC522<'a> {
 	 **/
 	#[inline]
 	pub fn pcd_transmitter_off(&mut self) {
-		self.register_clear_bit_mask(Reg::TxControl, 0x03);
+		let mask = Tx1RFEn | Tx2RFEn;
+		self.register_clear_bit_mask(Reg::TxControl, mask.bits());
 	}
 
 	/**
@@ -153,7 +187,7 @@ impl<'a> MFRC522<'a> {
 		// Stop any active command.
 		self.pcd_command(pcd::Cmd::Idle);
 		// Request the CRCIRq interrupt bit.
-		self.register_write(Reg::DivIrq, 0x04);
+		self.register_write(Reg::DivIrq, CRCIRq.bits());
 		// FlushBuffer = 1, FIFO initialization
 		self.register_set_bit_mask(Reg::FIFOLevel, 0x80);
 		// Write data to the FIFO
@@ -164,9 +198,8 @@ impl<'a> MFRC522<'a> {
 		// Wait for the CRC calculation to complete.
 		let mut i = 5000;
 		loop {
-			// DivIrqReg[7..0] bits are: Set2 reserved reserved MfinActIRq reserved CRCIRq reserved reserved
-			let irq = self.register_read(Reg::DivIrq);
-			if irq & 0x04 != 0 {
+			let divirq = self.reg_divirq();
+			if divirq.intersects(CRCIRq) {
 				// CRCIRq bit set - calculation done
 				break;
 			}
@@ -188,11 +221,6 @@ impl<'a> MFRC522<'a> {
 		Ok(crc)
 	}
 
-	#[inline]
-	pub fn pcd_command(&mut self, command: pcd::Cmd) {
-		self.register_write(Reg::Command, command as u8)
-	}
-
 	/**
 	 * Executes the Transceive command.
 	 *
@@ -200,10 +228,9 @@ impl<'a> MFRC522<'a> {
 	 **/
 	pub fn pcd_transceive_data(&mut self, send: &[u8], recv: Option<&mut [u8]>,
 	                           valid_bits: &mut u8, rx_align: u8, check_crc: bool) -> (Status, usize) {
-		// RxIRQ and IdleIRQ
-		let wait_irq: u8 = 0x30;
+		let wait_comirq = RxIRq | IdleIRq;
 
-		self.pcd_communicate_with_picc(pcd::Cmd::Transceive, wait_irq, send, recv, valid_bits, rx_align, check_crc)
+		self.pcd_communicate_with_picc(pcd::Cmd::Transceive, wait_comirq, send, recv, valid_bits, rx_align, check_crc)
 	}
 
 	/**
@@ -211,7 +238,7 @@ impl<'a> MFRC522<'a> {
 	 *
 	 * CRC validation can only be done if backData and backLen are specified.
 	 **/
-	pub fn pcd_communicate_with_picc(&mut self, command: pcd::Cmd, wait_irq: u8,
+	pub fn pcd_communicate_with_picc(&mut self, command: pcd::Cmd, wait_comirq: ComIrqBits,
 	                                 send: &[u8], recv: Option<&mut [u8]>, last_bits: &mut u8,
 	                                 rx_align: u8, check_crc: bool) -> (Status, usize) {
 		let mut nread = 0;
@@ -242,15 +269,14 @@ impl<'a> MFRC522<'a> {
 		// In mfrc522::init() we set the TAuto flag in TModeReg. This means the timer automatically starts when the PCD stops transmitting.
 		let mut i = 2000;
 		loop {
-			// ComIrqReg[7..0] bits are: Set1 TxIRq RxIRq IdleIRq HiAlertIRq LoAlertIRq ErrIRq TimerIRq
-			let n = self.register_read(Reg::ComIrq);
+			let comirq = self.reg_comirq();
 			// One of the interrupts that signal success has been set.
-			if n & wait_irq != 0 {
+			if comirq.intersects(wait_comirq) {
 				break;
 			}
 
 			// Timer interrupt - nothing received in 25ms
-			if n & 0x01 != 0 {
+			if comirq.intersects(TimerIRq) {
 				return (Status::Timeout, nread);
 			}
 
@@ -263,8 +289,8 @@ impl<'a> MFRC522<'a> {
 		}
 	
 		// Stop now if any errors except collisions were detected.
-		let error = self.pcd_error();
-		if error.contains(BufferOvfl | ParityErr | ProtocolErr) {
+		let error = self.reg_error();
+		if error.intersects(BufferOvfl | ParityErr | ProtocolErr) {
 			return (Status::Error, 0);
 		}
 
@@ -285,7 +311,7 @@ impl<'a> MFRC522<'a> {
 			debug!("RX |{}.{}|: {:?}.", n, *last_bits, recv);
 
 			// Tell about collisions
-			if error.contains(CollErr) {
+			if error.intersects(CollErr) {
 				return (Status::Collision, nread);
 			}
 

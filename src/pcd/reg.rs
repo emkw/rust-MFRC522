@@ -156,6 +156,7 @@ pub mod bits {
 	//! Re-exports of all defined registers bits.
 
 	pub use super::ComIrq::*;
+	pub use super::DivIrq::*;
 	pub use super::Error::*;
 	pub use super::TxControl::*;
 }
@@ -176,6 +177,26 @@ pub mod ComIrq {
 			const LoAlertIRq     = 1 << 2,
 			const ErrIRq         = 1 << 1,
 			const TimerIRq       = 1 << 0,
+		}
+	}
+}
+
+#[allow(non_snake_case)]
+#[allow(non_upper_case_globals)]
+pub mod DivIrq {
+	//! DivIrqReg (0x05) bits.
+
+	bitflags! {
+		/// Bitflags for DivIrqReg (0x05) bits.
+		pub flags DivIrqBits: u8 {
+			const Set2           = 1 << 7,
+			const _bit_05_6      = 1 << 6,
+			const _bit_05_5      = 1 << 5,
+			const MfinActIRq     = 1 << 4,
+			const _bit_05_3      = 1 << 3,
+			const CRCIRq         = 1 << 2,
+			const _bit_05_1      = 1 << 1,
+			const _bit_05_0      = 1 << 0,
 		}
 	}
 }
