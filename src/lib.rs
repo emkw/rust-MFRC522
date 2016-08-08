@@ -41,6 +41,7 @@ use core::ops::Mul;
 use bus::MFRC522Bus;
 use pcd::reg::Reg;
 use pcd::reg::bits::*;
+use picc::atqa::ATQA;
 use picc::uid::UID;
 
 pub struct MFRC522<'a> {
@@ -341,18 +342,18 @@ impl<'a> MFRC522<'a> {
 	}
 
 	/**
-	 * Returns `true` if a PICC responds to `PICC_CMD_REQA`.
+	 * Returns `Some(ATQA)` if a PICC responds to `PICC_CMD_REQA`
+	 * and `None` otherwise.
 	 *
 	 * Only "new" cards in state IDLE are invited. Sleeping cards in state HALT are ignored.
 	 **/
-	pub fn picc_is_new_card_present(&mut self) -> bool {
-		let mut buffer_atqa: [u8; 2] = [0; 2];
-		let status = self.picc_reqa(&mut buffer_atqa);
-
+	#[inline]
+	pub fn picc_is_new_card_present(&mut self) -> Option<ATQA> {
+		let (status, atqa) = self.picc_reqa();
 		match status {
 			Status::Ok        |
-			Status::Collision => true,
-			_ => false,
+			Status::Collision => Some(atqa),
+			_ => None,
 		}
 	}
 
@@ -649,8 +650,8 @@ impl<'a> MFRC522<'a> {
 	 * Beware: When two PICCs are in the field at the same time it often yields Error::Timeout - probably due do bad antenna design.
 	 **/
 	#[inline]
-	pub fn picc_reqa(&mut self, buffer: &mut [u8; 2]) -> Status {
-		self.picc_reqa_or_wupa(picc::Cmd::REQA, buffer)
+	pub fn picc_reqa(&mut self) -> (Status, ATQA) {
+		self.picc_reqa_or_wupa(picc::Cmd::REQA)
 	}
 
 	/**
@@ -660,8 +661,8 @@ impl<'a> MFRC522<'a> {
 	 * Beware: When two PICCs are in the field at the same time it often yields Error::Timeout - probably due do bad antenna design.
 	 **/
 	#[inline]
-	pub fn picc_wupa(&mut self, buffer: &mut [u8; 2]) -> Status {
-		self.picc_reqa_or_wupa(picc::Cmd::WUPA, buffer)
+	pub fn picc_wupa(&mut self) -> (Status, ATQA) {
+		self.picc_reqa_or_wupa(picc::Cmd::WUPA)
 	}
 
 	/**
@@ -706,7 +707,7 @@ impl<'a> MFRC522<'a> {
 	 *
 	 * Beware: When two PICCs are in the field at the same time it often yields Error::Timeout - probably due do bad antenna design.
 	 **/
-	pub fn picc_reqa_or_wupa(&mut self, command: picc::Cmd, buffer: &mut [u8; 2]) -> Status {
+	fn picc_reqa_or_wupa(&mut self, command: picc::Cmd) -> (Status, ATQA) {
 		// For REQA and WUPA we need the short frame format - transmit only 7 bits of the last (and only) byte.
 		// TxLastBits = BitFramingReg[2..0]
 		let mut valid_bits: u8 = 7;
@@ -714,15 +715,19 @@ impl<'a> MFRC522<'a> {
 		// ValuesAfterColl=1 => Bits received after collision are cleared.
 		self.register_clear_bit_mask(Reg::Coll, 0x80);
 		let data = &[command as u8];
+		let mut buffer_atqa = [0_u8; 2];
 
 		// TODO: enable CRC check.
-		let (status, _) = self.pcd_transceive_data(data, Some(&mut buffer[..]), &mut valid_bits, 0, false);
+		let (status, nread) = self.pcd_transceive_data(data, Some(buffer_atqa.as_mut()), &mut valid_bits, 0, false);
 
-		if status == Status::Ok && valid_bits != 0 {
+		if status == Status::Ok && (nread != 2 || valid_bits != 0) {
 			// ATQA must be exactly 16 bits.
-			Status::Error
+			(Status::Error, ATQA::from(0))
 		} else {
-			status
+			// The ISO/IEC 14443 transfers LSByte first (Little-endian).
+			let atqa_bits: u16 = (buffer_atqa[1] as u16) << 8 | buffer_atqa[0] as u16;
+
+			(status, ATQA::from(atqa_bits))
 		}
 	}
 

@@ -37,8 +37,8 @@ fn example() -> io::Result<()> {
 	let mut uid = mfrc522::picc::UID::default();
 	loop {
 		let new_card = mfrc522.picc_is_new_card_present();
-		if new_card {
-			println!("New card detected.");
+		if let Some(atqa) = new_card {
+			println!("New card detected. ATQA: {:04x}", atqa.bits());
 
 			let status = mfrc522.picc_select(&mut uid);
 			println!("Select: {:?} {:?}", status, uid);
