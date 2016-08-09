@@ -44,6 +44,15 @@ fn example() -> io::Result<()> {
 			println!("Select: {:?} {:?}", status, uid);
 			if status == Status::Ok {
 				println!("Card UID: {:?}", uid.as_bytes());
+
+				let mut buffer = [0_u8; 18];
+				let (read_status, nread) = mfrc522.mifare_read(0, &mut buffer);
+				if nread > 0 {
+					println!("Block 0 {:?}: {:?}", read_status, &buffer[..nread]);
+				} else {
+					println!("Could not read anything from block 0: {:?}", read_status);
+				}
+
 				let halt_status = mfrc522.picc_hlta();
 				println!("Halt: {:?}", halt_status);
 			}

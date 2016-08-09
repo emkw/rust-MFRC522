@@ -1,7 +1,8 @@
 # MFRC522
 
 Rust library for MFRC522 card reader.  
-This is (an incomplete) attempt to port C++ MFRC522 library by COOQROBOT et. al.
+This is (an incomplete) attempt to port
+[C++ MFRC522 library by Miguel Balboa et al., based on  based on code by Dr. Leong / COOQROBOT.](https://github.com/miguelbalboa/rfid)
 
 This is still Work in Progress. API is highly unstable at the moment.  
 Latest version of source code can be found @ https://github.com/emkw/rust-MFRC522.git
@@ -64,7 +65,7 @@ Details are found in chapter 6, Type A – Initialization and anticollision.
 
 If only the PICC UID is wanted, the above documents has all the needed information.
 To read and write from MIFARE PICCs, the MIFARE protocol is used after the PICC has been selected.
-  
+
 The MIFARE Classic chips and protocol is described in the datasheets:
 - 1K:   http://www.mouser.com/ds/2/302/MF1S503x-89574.pdf
 - 4K:   http://datasheet.octopart.com/MF1S7035DA4,118-NXP-Semiconductors-datasheet-11046188.pdf
@@ -118,7 +119,7 @@ The MIFARE Ultralight chip and protocol is described in the datasheets:
 - Pages 44-47 Authentication key.
 
 ## Credits
-Original C++ MFRC522 library:
+[Original C++ MFRC522 library:](https://github.com/miguelbalboa/rfid)
 - Based on code Dr.Leong   (WWW.B2CQSHOP.COM)
 - Created by Miguel Balboa (circuitito.com), Jan, 2012.
 - Rewritten by Søren Thing Andersen (access.thing.dk), fall of 2013 (Translation to English, refactored, comments, anti collision, cascade levels.)
