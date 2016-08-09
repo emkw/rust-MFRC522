@@ -8,7 +8,8 @@
 /// UID struct.
 ///
 /// UID is either 4, 7 or 10 bytes.
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy,Clone)]
+#[cfg_attr(not(feature = "ndebug"), derive(Debug))]
 pub struct UID {
 	/// The UID
 	uid: [u8; 10],

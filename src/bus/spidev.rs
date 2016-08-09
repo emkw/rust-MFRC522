@@ -25,7 +25,7 @@ impl MFRC522Bus for Spidev {
 		let mut rx_buf: [u8; 1] = [0];
 		try_map_err!(self.write(&[reg_addr]), ());
 		try_map_err!(self.read(&mut rx_buf), ());
-		trace!("{:?}/{:02x} -> {:?}", reg, reg_addr, rx_buf);
+		ntrace!("{:?}/{:02x} -> {:?}", reg, reg_addr, rx_buf);
 
 		Ok(rx_buf[0])
 	}
@@ -33,7 +33,7 @@ impl MFRC522Bus for Spidev {
 	#[inline]
 	fn register_write(&mut self, reg: Reg, value: u8) -> bus::Result<()> {
 		let reg_addr = bus::spi_reg_addr(reg, bus::Mode::Write);
-		trace!("{:?}/{:02x} <- {:02x}", reg, reg_addr, value);
+		ntrace!("{:?}/{:02x} <- {:02x}", reg, reg_addr, value);
 		try_map_err!(self.write(&[reg_addr, value]), ());
 
 		Ok(())
@@ -45,7 +45,7 @@ impl MFRC522Bus for Spidev {
 		tx_buf.push(reg_addr);
 		tx_buf.extend_from_slice(values);
 		let nwrit = try_map_err!(self.write(tx_buf.as_slice()), 0usize);
-		trace!("{:?}/{:02x} <- |{}/{}| {:?}", reg, reg_addr, nwrit, tx_buf.len(), &tx_buf.as_slice()[1..]);
+		ntrace!("{:?}/{:02x} <- |{}/{}| {:?}", reg, reg_addr, nwrit, tx_buf.len(), &tx_buf.as_slice()[1..]);
 
 		Ok(nwrit)
 	}

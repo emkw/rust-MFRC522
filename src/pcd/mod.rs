@@ -10,7 +10,8 @@ pub mod reg;
 pub use self::reg::Reg;
 
 /// MFRC522 commands. Described in chapter 10 of the datasheet.
-#[derive(Copy,Clone,Debug,Eq,PartialEq)]
+#[derive(Copy,Clone,Eq,PartialEq)]
+#[cfg_attr(not(feature = "ndebug"), derive(Debug))]
 #[repr(u8)]
 pub enum Cmd {
 	/// No action, cancels current command execution.
@@ -39,7 +40,8 @@ pub enum Cmd {
 /// www.nxp.com/documents/data_sheet/MFRC522.pdf
 /// Described in 9.3.3.6 / table 98 of the datasheet at http:
 #[allow(non_camel_case_types)]
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy,Clone)]
+#[cfg_attr(not(feature = "ndebug"), derive(Debug))]
 #[repr(u8)]
 pub enum RxGain {
 	/// 000b - 18 dB, minimum.

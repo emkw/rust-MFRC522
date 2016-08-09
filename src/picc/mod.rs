@@ -17,7 +17,8 @@ pub const CT: u8 = 0x88;
 
 /// Commands sent to the PICC.
 #[allow(non_camel_case_types)]
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy,Clone)]
+#[cfg_attr(not(feature = "ndebug"), derive(Debug))]
 #[repr(u8)]
 pub enum Cmd {
 	/// The commands used by the PCD to manage communication with several PICCs (ISO 14443-3, Type A, section 6.4)
@@ -63,7 +64,8 @@ pub enum Cmd {
 
 /// PICC types we can detect.
 #[allow(non_camel_case_types)]
-#[derive(Copy,Clone,Debug,Eq,PartialEq)]
+#[derive(Copy,Clone,Eq,PartialEq)]
+#[cfg_attr(not(feature = "ndebug"), derive(Debug))]
 pub enum Type {
 	/// Unknown PICC type
 	Unknown,

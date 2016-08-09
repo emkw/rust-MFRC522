@@ -93,7 +93,8 @@ pub trait MFRC522Bus {
 /// When sending SPI register address:
 /// - MSB = 1 is read operation.
 /// - MSB = 0 is write operation.
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy,Clone)]
+#[cfg_attr(not(feature = "ndebug"), derive(Debug))]
 #[repr(u8)]
 pub enum Mode {
 	Write = 0,

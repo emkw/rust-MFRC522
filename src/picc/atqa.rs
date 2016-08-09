@@ -6,7 +6,8 @@
 //! PICC ATQA (Answer To Request acc. to ISO/IEC 14443-4).
 
 /// ATQA struct.
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy,Clone)]
+#[cfg_attr(not(feature = "ndebug"), derive(Debug))]
 pub struct ATQA(u16);
 
 impl ATQA {

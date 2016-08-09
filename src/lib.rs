@@ -29,6 +29,8 @@ extern crate spidev;
 
 #[macro_use]
 mod macros;
+#[macro_use]
+mod ndebug;
 
 #[cfg(feature = "self_test")]
 pub mod self_test;
@@ -752,7 +754,7 @@ impl<'a> MFRC522<'a> {
 		} else {
 			self.pcd_crc_calculate(data)
 		};
-		debug!("crc_calculate(): {:?} -> {:?}", data, ret);
+		ndebug!("crc_calculate(): {:?} -> {:?}", data, ret);
 
 		ret
 	}
@@ -830,7 +832,8 @@ impl<'a> MFRC522<'a> {
 ///
 /// `Ok` should indicate correct data from all the functions.
 /// `Collision` may indicate correct data from some functions.
-#[derive(Copy,Clone,Debug,PartialEq)]
+#[derive(Copy,Clone,PartialEq)]
+#[cfg_attr(not(feature = "ndebug"), derive(Debug))]
 pub enum Status {
 	/// No errors.
 	Ok,

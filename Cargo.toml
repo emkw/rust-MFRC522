@@ -13,6 +13,12 @@ publish = false
 # By default the crate builds as no_std.
 default = []
 
+# Skip fmt::Debug implementations and logging that requires fmt::Debug.
+ndebug = []
+
+# Skip all logging.
+nlog = [ "log/max_level_off" ]
+
 # Compile without no_std.
 use_std = []
 
@@ -24,18 +30,14 @@ host_crc = []
 # embedded systems.
 self_test = []
 
-# Meta-feature enabling everything.
-all = ["host_crc", "i2cdev", "self_test", "spidev", "use_std"]
+# Meta-feature enabling everything, not bus-related.
+all = ["host_crc", "self_test", "use_std"]
 
 [dependencies]
 bitflags = "~0.7.0"
+log = "~0.3.4"
 i2cdev = { version = "~0.3.0", optional = true }
 spidev = { version = "~0.2.1", optional = true }
-
-[dependencies.log]
-version = "~0.3.4"
-default-features = false
-features = ["release_max_level_error"]
 
 [dev-dependencies]
 env_logger = "~0.3.4"
