@@ -20,29 +20,33 @@ use pcd::reg::Reg;
 
 impl MFRC522Bus for Spidev {
 	#[inline]
-	fn register_read(&mut self, reg: Reg) -> u8 {
+	fn register_read(&mut self, reg: Reg) -> bus::Result<u8> {
 		let reg_addr = bus::spi_reg_addr(reg, bus::Mode::Read);
 		let mut rx_buf: [u8; 1] = [0];
-		self.write(&[reg_addr]).unwrap();
-		self.read(&mut rx_buf).unwrap();
+		try_map_err!(self.write(&[reg_addr]), ());
+		try_map_err!(self.read(&mut rx_buf), ());
 		trace!("{:?}/{:02x} -> {:?}", reg, reg_addr, rx_buf);
 
-		rx_buf[0]
+		Ok(rx_buf[0])
 	}
 
 	#[inline]
-	fn register_write(&mut self, reg: Reg, value: u8) {
+	fn register_write(&mut self, reg: Reg, value: u8) -> bus::Result<()> {
 		let reg_addr = bus::spi_reg_addr(reg, bus::Mode::Write);
 		trace!("{:?}/{:02x} <- {:02x}", reg, reg_addr, value);
-		self.write(&[reg_addr, value]).unwrap();
+		try_map_err!(self.write(&[reg_addr, value]), ());
+
+		Ok(())
 	}
 
-	fn register_write_slice(&mut self, reg: Reg, values: &[u8]) {
+	fn register_write_slice(&mut self, reg: Reg, values: &[u8]) -> bus::MultiResult<usize> {
 		let reg_addr = bus::spi_reg_addr(reg, bus::Mode::Write);
 		let mut tx_buf = Vec::with_capacity(values.len() + 1);
 		tx_buf.push(reg_addr);
 		tx_buf.extend_from_slice(values);
-		let n = self.write(tx_buf.as_slice()).unwrap();
-		trace!("{:?}/{:02x} <- |{}/{}| {:?}", reg, reg_addr, n, tx_buf.len(), &tx_buf.as_slice()[1..]);
+		let nwrit = try_map_err!(self.write(tx_buf.as_slice()), 0usize);
+		trace!("{:?}/{:02x} <- |{}/{}| {:?}", reg, reg_addr, nwrit, tx_buf.len(), &tx_buf.as_slice()[1..]);
+
+		Ok(nwrit)
 	}
 }

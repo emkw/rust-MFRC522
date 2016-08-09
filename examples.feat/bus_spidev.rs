@@ -24,8 +24,8 @@ pub fn spi_open<P: AsRef<Path>>(path: P) -> io::Result<Spidev> {
 #[allow(dead_code)]
 fn example() -> io::Result<()> {
 	let mut bus = try!(spi_open("/dev/spidev0.0"));
-	let mut mfrc522 = MFRC522::init(&mut bus);
-	let version = mfrc522.register_read(Reg::Version);
+	let mut mfrc522 = MFRC522::init(&mut bus).expect("MFRC522 Initialization failed");
+	let version = mfrc522.register_read(Reg::Version).expect("Could not read version");
 	println!("Version: {:X}", version);
 
 	Ok(())

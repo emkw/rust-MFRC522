@@ -27,6 +27,9 @@ extern crate i2cdev;
 #[cfg(feature = "spidev")]
 extern crate spidev;
 
+#[macro_use]
+mod macros;
+
 #[cfg(feature = "self_test")]
 pub mod self_test;
 
@@ -62,37 +65,39 @@ impl<'a> MFRC522<'a> {
 	/**
 	 * Performs soft reset & initialization and returns new MFRC522 structure.
 	 **/
-	pub fn init(bus: &'a mut MFRC522Bus) -> Self {
+	pub fn init(bus: &'a mut MFRC522Bus) -> Result<Self, Status> {
 		let mut mfrc522 = Self::uninitialized(bus);
-		mfrc522.pcd_soft_reset();
-		mfrc522.pcd_init();
+		try_bus!(mfrc522.pcd_soft_reset());
+		try!(mfrc522.pcd_init());
 
-		mfrc522
+		Ok(mfrc522)
 	}
 
 	/**
 	 * Initializes the MFRC522 chip.
 	 **/
-	pub fn pcd_init(&mut self) {
+	pub fn pcd_init(&mut self) -> Result<(), Status> {
 		// When communicating with a PICC we need a timeout if something goes wrong.
 		// f_timer = 13.56 MHz / (2*TPreScaler+1) where TPreScaler = [TPrescaler_Hi:TPrescaler_Lo].
 
 		// TAuto=1; timer starts automatically at the end of the transmission in all communication modes at all speeds.
-		self.register_write(Reg::TMode, 0x80);
+		try_bus!(self.register_write(Reg::TMode, 0x80));
 		// TPreScaler = TModeReg[3..0]:TPrescalerReg, ie 0x0A9 = 169 => f_timer=40kHz, ie a timer period of 25µs.
-		self.register_write(Reg::TPrescaler, 0xA9);
+		try_bus!(self.register_write(Reg::TPrescaler, 0xA9));
 		// Reload timer with 0x3E8 = 1000, ie 25ms before timeout.
-		self.register_write(Reg::TReloadH, 0x03);
-		self.register_write(Reg::TReloadL, 0xE8);
+		try_bus!(self.register_write(Reg::TReloadH, 0x03));
+		try_bus!(self.register_write(Reg::TReloadL, 0xE8));
 
 		// Default 0x00. Force a 100 % ASK modulation independent of the ModGsPReg register setting
-		self.register_write(Reg::TxASK, 0x40);
+		try_bus!(self.register_write(Reg::TxASK, 0x40));
 
 		// Default 0x3F. Set the preset value for the CRC coprocessor for the CalcCRC command to 0x6363 (ISO 14443-3 part 6.2.4)
-		self.register_write(Reg::Mode, 0x3D);
+		try_bus!(self.register_write(Reg::Mode, 0x3D));
 
 		// Enable the transmitter.
-		self.pcd_transmitter_on();
+		try_bus!(self.pcd_transmitter_on());
+
+		Ok(())
 	}
 
 	/**
@@ -101,15 +106,15 @@ impl<'a> MFRC522<'a> {
 	 * NOTE: The SerialSpeedReg register is reset and therefore the serial data rate is set to 9600.
 	 **/
 	#[inline]
-	pub fn pcd_soft_reset(&mut self) {
-		self.pcd_command(pcd::Cmd::SoftReset);
+	pub fn pcd_soft_reset(&mut self) -> bus::Result<()> {
+		self.pcd_command(pcd::Cmd::SoftReset)
 	}
 
 	/**
 	 * Start a command execution on PCD by writing to CommandReg.
 	 **/
 	#[inline]
-	pub fn pcd_command(&mut self, command: pcd::Cmd) {
+	pub fn pcd_command(&mut self, command: pcd::Cmd) -> bus::Result<()> {
 		self.register_write(Reg::Command, command as u8)
 	}
 
@@ -119,10 +124,10 @@ impl<'a> MFRC522<'a> {
 	 * ErrorReg[7..0] bits are: WrErr TempErr (reserved)_bit_06_5 BufferOvfl CollErr CRCErr ParityErr ProtocolErr
 	 **/
 	#[inline]
-	pub fn reg_error(&mut self) -> ErrorBits {
-		let bits = self.register_read(Reg::Error);
+	pub fn reg_error(&mut self) -> bus::Result<ErrorBits> {
+		let bits = try!(self.register_read(Reg::Error));
 
-		ErrorBits::from_bits_truncate(bits)
+		Ok(ErrorBits::from_bits_truncate(bits))
 	}
 
 	/**
@@ -131,10 +136,10 @@ impl<'a> MFRC522<'a> {
 	 * ComIrqReg[7..0] bits are: Set1 TxIRq RxIRq IdleIRq HiAlertIRq LoAlertIRq ErrIRq TimerIRq
 	 **/
 	#[inline]
-	pub fn reg_comirq(&mut self) -> ComIrqBits {
-		let bits = self.register_read(Reg::ComIrq);
+	pub fn reg_comirq(&mut self) -> bus::Result<ComIrqBits> {
+		let bits = try!(self.register_read(Reg::ComIrq));
 
-		ComIrqBits::from_bits_truncate(bits)
+		Ok(ComIrqBits::from_bits_truncate(bits))
 	}
 
 	/**
@@ -143,10 +148,10 @@ impl<'a> MFRC522<'a> {
 	 * DivIrqReg[7..0] bits are: Set2 (reserved)_bit_05_[65] MfinActIRq (reserved)_bit_05_3 CRCIRq (reserved)_bit_05_[10]
 	 **/
 	#[inline]
-	pub fn reg_divirq(&mut self) -> DivIrqBits {
-		let bits = self.register_read(Reg::DivIrq);
+	pub fn reg_divirq(&mut self) -> bus::Result<DivIrqBits> {
+		let bits = try!(self.register_read(Reg::DivIrq));
 
-		DivIrqBits::from_bits_truncate(bits)
+		Ok(DivIrqBits::from_bits_truncate(bits))
 	}
 
 	/**
@@ -154,18 +159,20 @@ impl<'a> MFRC522<'a> {
 	 * After a reset these pins are disabled.
 	 **/
 	#[inline]
-	pub fn pcd_transmitter_on(&mut self) {
+	pub fn pcd_transmitter_on(&mut self) -> bus::Result<()> {
 		let mask = Tx1RFEn | Tx2RFEn;
-		self.register_set_bit_mask(Reg::TxControl, mask.bits());
+
+		self.register_set_bit_mask(Reg::TxControl, mask.bits())
 	}
 
 	/**
 	 * Turns the transmitter off by disabling pins TX1 and TX2.
 	 **/
 	#[inline]
-	pub fn pcd_transmitter_off(&mut self) {
+	pub fn pcd_transmitter_off(&mut self) -> bus::Result<()> {
 		let mask = Tx1RFEn | Tx2RFEn;
-		self.register_clear_bit_mask(Reg::TxControl, mask.bits());
+
+		self.register_clear_bit_mask(Reg::TxControl, mask.bits())
 	}
 
 	/**
@@ -174,10 +181,10 @@ impl<'a> MFRC522<'a> {
 	 * Remember to call this function after communicating with an authenticated PICC - otherwise no new communications can start.
 	 **/
 	#[inline]
-	pub fn pcd_stopcrypto1(&mut self) {
+	pub fn pcd_stopcrypto1(&mut self) -> bus::Result<()> {
 		// Clear MFCrypto1On bit
 		// Status2Reg[7..0] bits are: TempSensClear I2CForceHS reserved reserved MFCrypto1On ModemState[2:0]
-		self.register_clear_bit_mask(Reg::Status2, 0x08);
+		self.register_clear_bit_mask(Reg::Status2, 0x08)
 	}
 
 	/**
@@ -186,20 +193,20 @@ impl<'a> MFRC522<'a> {
 	#[inline]
 	pub fn pcd_crc_calculate(&mut self, data: &[u8]) -> Result<u16, Status> {
 		// Stop any active command.
-		self.pcd_command(pcd::Cmd::Idle);
+		try_bus!(self.pcd_command(pcd::Cmd::Idle));
 		// Request the CRCIRq interrupt bit.
-		self.register_write(Reg::DivIrq, CRCIRq.bits());
+		try_bus!(self.register_write(Reg::DivIrq, CRCIRq.bits()));
 		// FlushBuffer = 1, FIFO initialization
-		self.register_set_bit_mask(Reg::FIFOLevel, 0x80);
+		try_bus!(self.register_set_bit_mask(Reg::FIFOLevel, 0x80));
 		// Write data to the FIFO
-		self.register_write_slice(Reg::FIFOData, data);
+		try_bus!(self.register_write_slice(Reg::FIFOData, data));
 		// Start the calculation
-		self.pcd_command(pcd::Cmd::CalcCRC);
+		try_bus!(self.pcd_command(pcd::Cmd::CalcCRC));
 
 		// Wait for the CRC calculation to complete.
 		let mut i = 5000;
 		loop {
-			let divirq = self.reg_divirq();
+			let divirq = try_bus!(self.reg_divirq());
 			if divirq.intersects(CRCIRq) {
 				// CRCIRq bit set - calculation done
 				break;
@@ -212,11 +219,11 @@ impl<'a> MFRC522<'a> {
 			}
 		}
 		// Stop calculating CRC for new content in the FIFO.
-		self.pcd_command(pcd::Cmd::Idle);
+		try_bus!(self.pcd_command(pcd::Cmd::Idle));
 
 		// Transfer the result from the registers and compose u16.
-		let crc_lo = self.register_read(Reg::CRCResultL);
-		let crc_hi = self.register_read(Reg::CRCResultH);
+		let crc_lo = try_bus!(self.register_read(Reg::CRCResultL));
+		let crc_hi = try_bus!(self.register_read(Reg::CRCResultH));
 		let crc = (crc_hi as u16) << 8 | crc_lo as u16;
 
 		Ok(crc)
@@ -250,27 +257,27 @@ impl<'a> MFRC522<'a> {
 		debug!("TX |{}.{}|: {:?}.", send.len(), last_bits, send);
 
 		// Stop any active command
-		self.pcd_command(pcd::Cmd::Idle);
+		bus!(self.pcd_command(pcd::Cmd::Idle), return nread);
 		// Clear all seven interrupt request bits.
-		self.register_write(Reg::ComIrq, 0x7F);
+		bus!(self.register_write(Reg::ComIrq, 0x7F), return nread);
 		// FlushBuffer = 1, FIFO initialization
-		self.register_set_bit_mask(Reg::FIFOLevel, 0x80);
+		bus!(self.register_set_bit_mask(Reg::FIFOLevel, 0x80), return nread);
 		// Write data to the FIFO
-		self.register_write_slice(Reg::FIFOData, send);
+		bus!(self.register_write_slice(Reg::FIFOData, send), return nread);
 		// Bit adjustments
-		self.register_write(Reg::BitFraming, bit_framing);
+		bus!(self.register_write(Reg::BitFraming, bit_framing), return nread);
 		// Execute the command
-		self.pcd_command(command);
+		bus!(self.pcd_command(command), return nread);
 		if command == pcd::Cmd::Transceive {
 			// StartSend=1, transmission of data starts
-			self.register_set_bit_mask(Reg::BitFraming, 0x80);
+			bus!(self.register_set_bit_mask(Reg::BitFraming, 0x80), return nread);
 		}
 
 		// Wait for the command to complete.
 		// In mfrc522::init() we set the TAuto flag in TModeReg. This means the timer automatically starts when the PCD stops transmitting.
 		let mut i = 2000;
 		loop {
-			let comirq = self.reg_comirq();
+			let comirq = bus!(self.reg_comirq(), return nread);
 			// One of the interrupts that signal success has been set.
 			if comirq.intersects(wait_comirq) {
 				break;
@@ -290,7 +297,7 @@ impl<'a> MFRC522<'a> {
 		}
 	
 		// Stop now if any errors except collisions were detected.
-		let error = self.reg_error();
+		let error = bus!(self.reg_error(), return nread);
 		if error.intersects(BufferOvfl | ParityErr | ProtocolErr) {
 			return (Status::Error, 0);
 		}
@@ -298,17 +305,17 @@ impl<'a> MFRC522<'a> {
 		// If the caller wants recv data, get it from the MFRC522.
 		if let Some(recv) = recv {
 			// Number of bytes in the FIFO
-			let n = self.register_read(Reg::FIFOLevel) as usize;
+			let n = bus!(self.register_read(Reg::FIFOLevel), return nread) as usize;
 			trace!("RX |{}/{}|.", n, recv.len());
 
 			if n > recv.len() {
 				return (Status::BufferShort, nread);
 			}
 			// Get received data from FIFO
-			self.register_read_to_slice(Reg::FIFOData, &mut recv[0..n], rx_align);
+			bus!(self.register_read_to_slice(Reg::FIFOData, &mut recv[0..n], rx_align), return nread);
 			nread = n;
 			// RxLastBits[2:0] indicates the number of valid bits in the last received byte. If this value is 000b, the whole byte is valid.
-			*last_bits = self.register_read(Reg::Control) & 0x07;
+			*last_bits = 0x07 & bus!(self.register_read(Reg::Control), return nread);
 			debug!("RX |{}.{}|: {:?}.", n, *last_bits, recv);
 
 			// Tell about collisions
@@ -410,7 +417,7 @@ impl<'a> MFRC522<'a> {
 
 		// Prepare MFRC522
 		// ValuesAfterColl=1 => Bits received after collision are cleared.
-		self.register_clear_bit_mask(Reg::Coll, 0x80);
+		bus!(self.register_clear_bit_mask(Reg::Coll, 0x80));
 
 		let mut cascade_level = 1;
 		// Repeat Cascade Level loop until we have a complete UID.
@@ -537,7 +544,7 @@ impl<'a> MFRC522<'a> {
 				// Having a separate binding is overkill. But it makes the next line easier to read.
 				let rx_align = last_bits;
 				// RxAlign = BitFramingReg[6...4]. TxLastBits = BitFramingReg[2...0]
-				self.register_write(Reg::BitFraming, (rx_align << 4) | last_bits);
+				bus!(self.register_write(Reg::BitFraming, (rx_align << 4) | last_bits));
 
 				// Transmit the buffer and receive the response.
 				let (result, nread) = self.pcd_transceive_data(&tx_buffer[..tx_len], Some(rx_buffer.as_mut()), &mut last_bits, rx_align, false);
@@ -560,7 +567,7 @@ impl<'a> MFRC522<'a> {
 
 					if result == Status::Collision { // More than one PICC in the field => collision.
 						// CollReg[7..0] bits are: ValuesAfterColl reserved CollPosNotValid CollPos[4:0]
-						let value_of_coll_reg = self.register_read(Reg::Coll);
+						let value_of_coll_reg = bus!(self.register_read(Reg::Coll));
 
 						if value_of_coll_reg & 0x20 != 0 { // CollPosNotValid
 							// Without a valid collision position we cannot continue.
@@ -599,7 +606,7 @@ impl<'a> MFRC522<'a> {
 								// Check the returned BCC.
 								let bcc_sum = rx_buffer[0] ^ rx_buffer[1] ^ rx_buffer[2] ^ rx_buffer[3] ^ rx_buffer[4];
 								if bcc_sum != 0 {
-									return Status::Error;
+									return Status::BCCError;
 								}
 							}
 
@@ -713,13 +720,12 @@ impl<'a> MFRC522<'a> {
 		let mut valid_bits: u8 = 7;
 	
 		// ValuesAfterColl=1 => Bits received after collision are cleared.
-		self.register_clear_bit_mask(Reg::Coll, 0x80);
+		bus!(self.register_clear_bit_mask(Reg::Coll, 0x80), return ATQA::from(0));
 		let data = &[command as u8];
 		let mut buffer_atqa = [0_u8; 2];
 
 		// TODO: enable CRC check.
 		let (status, nread) = self.pcd_transceive_data(data, Some(buffer_atqa.as_mut()), &mut valid_bits, 0, false);
-
 		if status == Status::Ok && (nread != 2 || valid_bits != 0) {
 			// ATQA must be exactly 16 bits.
 			(Status::Error, ATQA::from(0))
@@ -765,45 +771,49 @@ impl<'a> MFRC522<'a> {
 	 * Sets the bits given in `mask` in register `reg`.
 	 **/
 	#[inline]
-	pub fn register_set_bit_mask(&mut self, reg: Reg, mask: u8) {
-		let current = self.register_read(reg);
+	pub fn register_set_bit_mask(&mut self, reg: Reg, mask: u8) -> bus::Result<()> {
+		let current = try!(self.register_read(reg));
 		if (current & mask) != mask {
-			self.register_write(reg, current | mask);
+			try!(self.register_write(reg, current | mask));
 		}
+
+		Ok(())
 	}
 
 	/**
 	 * Clears the bits given in `mask` from register `reg`.
 	 **/
 	#[inline]
-	pub fn register_clear_bit_mask(&mut self, reg: Reg, mask: u8) {
-		let current = self.register_read(reg);
+	pub fn register_clear_bit_mask(&mut self, reg: Reg, mask: u8) -> bus::Result<()> {
+		let current = try!(self.register_read(reg));
 		if (current & mask) != 0x00 {
-			self.register_write(reg, current & !mask);
+			try!(self.register_write(reg, current & !mask));
 		}
+
+		Ok(())
 	}
 
 	/**
 	 * Writes byte `value` to register `reg`.
 	 **/
 	#[inline]
-	pub fn register_write(&mut self, reg: Reg, value: u8) {
-		self.bus.register_write(reg, value);
+	pub fn register_write(&mut self, reg: Reg, value: u8) -> bus::Result<()> {
+		self.bus.register_write(reg, value)
 	}
 
 	/**
 	 * Writes bytes `values` to register `reg`.
 	 **/
 	#[inline]
-	pub fn register_write_slice(&mut self, reg: Reg, values: &[u8]) {
-		self.bus.register_write_slice(reg, values);
+	pub fn register_write_slice(&mut self, reg: Reg, values: &[u8]) -> bus::MultiResult<usize> {
+		self.bus.register_write_slice(reg, values)
 	}
 
 	/**
 	 * Reads byte from register `reg`.
 	 **/
 	#[inline]
-	pub fn register_read(&mut self, reg: Reg) -> u8 {
+	pub fn register_read(&mut self, reg: Reg) -> bus::Result<u8> {
 		self.bus.register_read(reg)
 	}
 
@@ -811,29 +821,52 @@ impl<'a> MFRC522<'a> {
 	 * Reads bytes from register `reg` into slice `values`.
 	 **/
 	#[inline]
-	pub fn register_read_to_slice(&mut self, reg: Reg, buf: &mut [u8], rx_align: u8) {
+	pub fn register_read_to_slice(&mut self, reg: Reg, buf: &mut [u8], rx_align: u8) -> bus::MultiResult<usize> {
 		self.bus.register_read_to_slice_align(reg, buf, rx_align)
 	}
 }
 
 /// Status codes returned by the functions.
+///
+/// `Ok` should indicate correct data from all the functions.
+/// `Collision` may indicate correct data from some functions.
 #[derive(Copy,Clone,Debug,PartialEq)]
 pub enum Status {
+	/// No errors.
 	Ok,
-	/// Error in communication.
-	Error,
+
 	/// Collission detected.
 	Collision,
+	/// The CRC_A does not match
+	CRCError,
+	/// The BCC byte check (parity) is not correct.
+	BCCError,
+
+	/// Low-level (bus) error in communication.
+	///
+	/// This is returned when MFRC522Bus implementation
+	/// Returns an error.
+	BusError,
 	/// Timeout in communication.
+	///
+	/// The reader haven't responded to request within
+	/// the time limit.
 	Timeout,
-	/// A buffer is not big enough.
+
+	/// Error in communication.
+	///
+	/// The reader has responded, but the response was
+	/// not what was expected.
+	Error,
+	/// A MIFARE PICC responded with NAK.
+	MifareNAK,
+
+	/// Invalid function argument.
+	///
+	/// Some value may be outside of the supported range.
+	InvalidArg,
+	/// Receive buffer is not big enough for the response.
 	BufferShort,
 	/// Internal error in the code. Should not happen ;-)
 	Bug,
-	/// Invalid argument.
-	InvalidArg,
-	/// The CRC_A does not match
-	CRCError,
-	/// A MIFARE PICC responded with NAK.
-	MifareNAK,
 }

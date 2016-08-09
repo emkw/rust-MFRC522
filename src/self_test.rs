@@ -10,6 +10,7 @@
 //! Provides `self_test()` method for MFRC522.
 
 use MFRC522;
+use Status;
 use pcd::Cmd;
 use pcd::reg::Reg;
 use pcd::reg::bits::*;
@@ -19,46 +20,46 @@ impl<'a> MFRC522<'a> {
 	 * Performs a self-test of the MFRC522
 	 * See 16.1.1 in http://www.nxp.com/documents/data_sheet/MFRC522.pdf
      **/
-	pub fn self_test(&mut self) -> bool {
+	pub fn self_test(&mut self) -> Status {
 		// This follows directly the steps outlined in 16.1.1
 		// 1. Perform a soft reset.
-		self.pcd_soft_reset();
+		bus!(self.pcd_soft_reset());
 
 		// 2. Clear the internal buffer by writing 25 bytes of 00h.
 		let zeroes: [u8; 25] = [0; 25];
 		// flush the FIFO buffer
-		self.register_set_bit_mask(Reg::FIFOLevel, 0x80);
+		bus!(self.register_set_bit_mask(Reg::FIFOLevel, 0x80));
 		// write 25 bytes of 00h to FIFO
-		self.register_write_slice(Reg::FIFOData, zeroes.as_ref());
+		bus!(self.register_write_slice(Reg::FIFOData, zeroes.as_ref()));
 		// transfer to internal buffer
-		self.pcd_command(Cmd::Mem);
+		bus!(self.pcd_command(Cmd::Mem));
 
 		// 3. Enable self-test.
-		self.register_write(Reg::AutoTest, 0x09);
+		bus!(self.register_write(Reg::AutoTest, 0x09));
 
 		// 4. Write 00h to FIFO buffer.
-		self.register_write(Reg::FIFOData, 0x00);
+		bus!(self.register_write(Reg::FIFOData, 0x00));
 	
 		// 5. Start self-test by issuing the CalcCRC command.
-		self.pcd_command(Cmd::CalcCRC);
+		bus!(self.pcd_command(Cmd::CalcCRC));
 
 		// 6. Wait for self-test to complete.
 		for _ in 0..0xFF {
-			let divirq = self.reg_divirq();
+			let divirq = bus!(self.reg_divirq());
 			// CRCIRq bit is set <=> calculation done.
 			if divirq.intersects(CRCIRq) {
 				break;
 			}
 		}
 		// Stop calculating CRC for new content in the FIFO.
-		self.pcd_command(Cmd::Idle);
+		bus!(self.pcd_command(Cmd::Idle));
 
 		// 7. Read out resulting 64 bytes from the FIFO buffer.
 		let mut result: [u8; 64] = [0; 64];
-		self.register_read_to_slice(Reg::FIFOData, result.as_mut(), 0);
+		bus!(self.register_read_to_slice(Reg::FIFOData, result.as_mut(), 0));
 
 		// Determine firmware version (see section 9.3.4.8 in spec)
-		let version = self.register_read(Reg::Version);
+		let version = bus!(self.register_read(Reg::Version));
 		// Pick the appropriate reference values.
 		let reference = match version {
 			0x88 => reference::FM17522,
@@ -67,18 +68,18 @@ impl<'a> MFRC522<'a> {
 			0x92 => reference::MFRC522_V2_0,
 
 			// Unknown version - abort test
-			_    => return false,
+			_    => return Status::Error,
 		};
 
 		// Verify that the results match up to our expectations.
 		for i in 0..reference.len() {
 			if result[i] != reference[i] {
-				return false;
+				return Status::Error;
 			}
 		}
 
 		// Test passed; all is good.
-		true
+		Status::Ok
 	}
 }
 

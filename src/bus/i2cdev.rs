@@ -10,16 +10,23 @@
 
 use i2cdev::core::I2CDevice;
 
+use bus;
 use bus::MFRC522Bus;
 
 use pcd::reg::Reg;
 
 impl<B: I2CDevice> MFRC522Bus for B {
-	fn register_read(&mut self, reg: Reg) -> u8 {
-		self.smbus_read_byte_data(reg as u8).unwrap()
+	#[inline]
+	fn register_read(&mut self, reg: Reg) -> bus::Result<u8> {
+		let value = try_map_err!(self.smbus_read_byte_data(reg as u8), ());
+
+		Ok(value)
 	}
 
-	fn register_write(&mut self, reg: Reg, value: u8) {
-		self.smbus_write_byte_data(reg as u8, value).unwrap()
+	#[inline]
+	fn register_write(&mut self, reg: Reg, value: u8) -> bus::Result<()> {
+		try_map_err!(self.smbus_write_byte_data(reg as u8, value), ());
+
+		Ok(())
 	}
 }

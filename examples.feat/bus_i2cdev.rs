@@ -8,9 +8,9 @@ use mfrc522::pcd::Reg;
 
 fn example() -> Result<(), LinuxI2CError> {
 	let mut bus = try!(LinuxI2CDevice::new("/dev/i2c-1", 0));
-	let mut mfrc522 = MFRC522::init(&mut bus);
+	let mut mfrc522 = MFRC522::init(&mut bus).expect("MFRC522 Initialization failed");
 
-	let version = mfrc522.register_read(Reg::Version);
+	let version = mfrc522.register_read(Reg::Version).expect("Could not read version");
 	println!("Version: {:X}", version);
 
 	Ok(())

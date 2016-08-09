@@ -16,49 +16,77 @@ pub mod spidev;
 
 use pcd::reg::Reg;
 
+/// Bus Result type, for single-byte read/write operations.
+pub type Result<T> = ::core::result::Result<T, ()>;
+
+/// Bus Result type, for multi-byte read/write operations.
+///
+/// Essentially: return `Ok(T)` on success and `Err(T)` on error.
+///
+/// Typically T will be usize - number of bytes read/written so far.
+///
+/// Err may pass down as Status::BusError from MFRC522 functions.
+pub type MultiResult<T> = ::core::result::Result<T, T>;
+
 pub trait MFRC522Bus {
 	/// Read single byte from MFRC522 register.
-	fn register_read(&mut self, reg: Reg) -> u8;
+	#[must_use]
+	fn register_read(&mut self, reg: Reg) -> Result<u8>;
 	/// Write single byte to MFRC522 register.
-	fn register_write(&mut self, reg: Reg, value: u8);
+	#[must_use]
+	fn register_write(&mut self, reg: Reg, value: u8) -> Result<()>;
 
-	#[inline]
 	/// Write multiple bytes to a single MFRC522 register.
-	fn register_write_slice(&mut self, reg: Reg, values: &[u8]) {
+	#[must_use]
+	fn register_write_slice(&mut self, reg: Reg, values: &[u8]) -> MultiResult<usize> {
+		let mut nwrit = 0;
 		for byte in values {
-			self.register_write(reg, *byte);
+			try_map_err!(self.register_write(reg, *byte), nwrit);
+			nwrit += 1;
 		}
+
+		Ok(nwrit)
 	}
 
-	#[inline]
 	/// Read multiple bytes from a single MFRC522 register.
-	fn register_read_to_slice(&mut self, reg: Reg, buf: &mut [u8]) {
+	#[must_use]
+	fn register_read_to_slice(&mut self, reg: Reg, buf: &mut [u8]) -> MultiResult<usize> {
+		let mut nread = 0;
 		for b in buf {
-			*b = self.register_read(reg);
+			*b = try_map_err!(self.register_read(reg), nread);
+			nread += 1;
 		}
+
+		Ok(nread)
 	}
 
 	/// Read multiple bytes from a single MFRC522 register,
 	/// only partialy overwriting the first buffer byte.
-	fn register_read_to_slice_align(&mut self, reg: Reg, buf: &mut [u8], rx_align: u8) {
-		if buf.len() > 0 {
-			let buf_tail = if rx_align != 0 {
-				let (buf_head, buf_tail) = buf.split_at_mut(1);
-				// Only update bit positions rxAlign..7 in buf[0]
-				// Create bit mask for bit positions rxAlign..7
-				let mask = (!0_u8).checked_shl(rx_align as u32).unwrap_or(0);
-				let value = self.register_read(reg);
-				// Apply mask to both current value of buf[0] and the new data in value.
-				buf_head[0] = (buf_head[0] & !mask) | (value & mask);
-
-				buf_tail
-			} else {
-				buf
-			};
-
-			// Read the rest of data.
-			self.register_read_to_slice(reg, buf_tail);
+	#[must_use]
+	fn register_read_to_slice_align(&mut self, reg: Reg, buf: &mut [u8], rx_align: u8) -> MultiResult<usize> {
+		if buf.len() == 0 {
+			return Ok(0)
 		}
+
+		let mut nread = 0;
+		let buf_tail = if rx_align != 0 {
+			let (buf_head, buf_tail) = buf.split_at_mut(1);
+			let value = try_map_err!(self.register_read(reg), nread);
+			// Only update bit positions rxAlign..7 in buf[0]
+			buf_head[0] = rx_align_u8(buf_head[0], value, rx_align);
+			nread += 1;
+
+			buf_tail
+		} else {
+			buf
+		};
+
+		if buf_tail.len() > 0 {
+			// Read the rest of data.
+			nread += try!(self.register_read_to_slice(reg, buf_tail).map_err(|sread| sread + nread))
+		}
+
+		Ok(nread)
 	}
 }
 
@@ -70,6 +98,21 @@ pub trait MFRC522Bus {
 pub enum Mode {
 	Write = 0,
 	Read  = 1 << 7,
+}
+
+/// Helper function doing rx_align on a byte.
+///
+/// It only updates bit positions 7...`rx_align` in the `byte`
+/// with bits from `bits`.
+/// TODO: Investigate - this should mimic the original implementation, but
+///       shouldn't the lower bytes be updated, rather than higher in the
+///       original implementation?
+#[inline]
+pub fn rx_align_u8(byte: u8, bits: u8, rx_align: u8) -> u8 {
+	// Create bit mask for bit positions rx_align..7
+	let mask = (!0_u8).checked_shl(rx_align as u32).unwrap_or(0);
+	// Apply mask to both current value of byte and the new data in bits.
+	(byte & !mask) | (bits & mask)
 }
 
 /// Helper function for SPI.

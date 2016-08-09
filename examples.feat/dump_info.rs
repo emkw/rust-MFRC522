@@ -17,22 +17,22 @@ use mfrc522::pcd::Reg;
 
 fn example() -> io::Result<()> {
 	let mut bus = try!(spi_open("/dev/spidev0.0"));
-	let mut mfrc522 = MFRC522::init(&mut bus);
+	let mut mfrc522 = MFRC522::init(&mut bus).expect("MFRC522 Initialization failed");
 
-	let version = mfrc522.register_read(Reg::Version);
+	let version = mfrc522.register_read(Reg::Version).expect("Could not read version");
 	println!("Version: {:X}.", version);
 
 	println!("Starting self-test.");
-	let test_ok = mfrc522.self_test();
-	if test_ok {
+	let test_status = mfrc522.self_test();
+	if test_status == Status::Ok {
 		println!("Self-test: PASSED.");
 	} else {
-		println!("Self-test: FAILED.");
+		println!("Self-test: FAILED: {:?}", test_status);
 	}
 
 	// Re-init after self-test.
-	mfrc522.pcd_soft_reset();
-	mfrc522.pcd_init();
+	mfrc522.pcd_soft_reset().expect("Failed to reset MFRC522");
+	mfrc522.pcd_init().expect("Failed to re-init MFRC522");
 
 	let mut uid = mfrc522::picc::UID::default();
 	loop {
