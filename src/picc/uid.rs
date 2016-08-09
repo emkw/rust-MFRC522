@@ -72,6 +72,11 @@ impl UID {
 	}
 
 	#[inline]
+	pub fn picc_type(&self) -> super::Type {
+		super::Type::from_sak(self.sak)
+	}
+
+	#[inline]
 	pub fn set_sak(&mut self, value: u8) {
 		self.sak = value;
 	}

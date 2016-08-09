@@ -60,3 +60,58 @@ pub enum Cmd {
 	/// Writes one 4 byte page to the PICC.
 	UL_WRITE		= 0xA2,
 }
+
+/// PICC types we can detect.
+#[allow(non_camel_case_types)]
+#[derive(Copy,Clone,Debug,Eq,PartialEq)]
+pub enum Type {
+	/// Unknown PICC type
+	Unknown,
+	/// SAK indicates UID is not complete
+	Incomplete,
+	/// PICC compliant with ISO/IEC 14443-4
+	ISO_14443_4,
+	/// PICC compliant with ISO/IEC 18092 (NFC)
+	ISO_18092,
+	/// MIFARE Classic protocol, 320 bytes
+	MIFARE_MINI,
+	/// MIFARE Classic protocol, 1KB
+	MIFARE_1K,
+	/// MIFARE Classic protocol, 4KB
+	MIFARE_4K,
+	/// MIFARE Ultralight or Ultralight C
+	MIFARE_UL,
+	/// MIFARE Plus
+	MIFARE_PLUS,
+	/// Only mentioned in NXP AN 10833 MIFARE Type Identification Procedure
+	TNP3XXX,
+}
+
+impl Type {
+
+	/// Get picc::Type from SAK byte.
+	pub fn from_sak(sak: u8) -> Self {
+		use self::Type::*;
+
+		// http://www.nxp.com/documents/application_note/AN10833.pdf
+		// 3.2 Coding of Select Acknowledge (SAK)
+		// ignore 8-bit (iso14443 starts with LSBit = bit 1)
+		// fixes wrong type for manufacturer Infineon (http://nfc-tools.org/index.php?title=ISO14443A)
+		match sak & 0x7F {
+			0x04 => Incomplete,
+			0x09 => MIFARE_MINI,
+			0x08 => MIFARE_1K,
+			0x18 => MIFARE_4K,
+			0x00 => MIFARE_UL,
+
+			0x10 |
+			0x11 => MIFARE_PLUS,
+
+			0x20 => ISO_14443_4,
+			0x40 => ISO_18092,
+			0x01 => TNP3XXX,
+
+			_ => Unknown,
+		}
+	}
+}
