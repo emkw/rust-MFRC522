@@ -12,8 +12,8 @@ use std::thread;
 use std::time::Duration;
 
 use mfrc522::MFRC522;
-use mfrc522::Status;
 use mfrc522::pcd::Reg;
+use mfrc522::picc::UID;
 
 fn example() -> io::Result<()> {
 	let mut bus = try!(spi_open("/dev/spidev0.0"));
@@ -24,7 +24,7 @@ fn example() -> io::Result<()> {
 
 	println!("Starting self-test.");
 	let test_status = mfrc522.self_test();
-	if test_status == Status::Ok {
+	if test_status.is_ok() {
 		println!("Self-test: PASSED.");
 	} else {
 		println!("Self-test: FAILED: {:?}", test_status);
@@ -34,7 +34,7 @@ fn example() -> io::Result<()> {
 	mfrc522.pcd_soft_reset().expect("Failed to reset MFRC522");
 	mfrc522.pcd_init().expect("Failed to re-init MFRC522");
 
-	let mut uid = mfrc522::picc::UID::default();
+	let mut uid = UID::default();
 	loop {
 		let new_card = mfrc522.picc_is_new_card_present();
 		if let Some(atqa) = new_card {
@@ -42,16 +42,8 @@ fn example() -> io::Result<()> {
 
 			let status = mfrc522.picc_select(&mut uid);
 			println!("Select: {:?} {:?}", status, uid);
-			if status == Status::Ok {
+			if status.is_ok() {
 				println!("Card UID: {:?}", uid.as_bytes());
-
-				let mut buffer = [0_u8; 18];
-				let (read_status, nread) = mfrc522.mifare_read(0, &mut buffer);
-				if nread > 0 {
-					println!("Block 0 {:?}: {:?}", read_status, &buffer[..nread]);
-				} else {
-					println!("Could not read anything from block 0: {:?}", read_status);
-				}
 
 				let halt_status = mfrc522.picc_hlta();
 				println!("Halt: {:?}", halt_status);

@@ -37,6 +37,8 @@ pub mod self_test;
 
 pub mod bus;
 pub mod host;
+#[doc(hidden)]
+pub mod mifare;
 pub mod pcd;
 pub mod picc;
 
@@ -287,6 +289,7 @@ impl<'a> MFRC522<'a> {
 
 			// Timer interrupt - nothing received in 25ms
 			if comirq.intersects(TimerIRq) {
+				debug!("TimerIRq triggered.");
 				return (Status::Timeout, nread);
 			}
 
@@ -294,6 +297,7 @@ impl<'a> MFRC522<'a> {
 			// Communication with the MFRC522 might be down.
 			i -= 1;
 			if i == 0 {
+				warn!("Timeout waiting for TimerIRq.");
 				return (Status::Timeout, nread);
 			}
 		}
@@ -760,6 +764,29 @@ impl<'a> MFRC522<'a> {
 	}
 
 	/**
+	 * Calculate CRC of all but last 2 bytes of `buffer`,
+	 * and write it to the last 2 bytes of `buffer`.
+	 *
+	 * Calculates CRC_A, on host or on PCD, controlled at compile-time with
+	 * feature `host_crc`.
+	 **/
+	pub fn crc_append(&mut self, buffer: &mut [u8]) -> Status {
+		let split = buffer.len() - 2;
+		let (data, crc_buffer) = buffer.split_at_mut(split);
+		let crc = self.crc_calculate(data);
+		match crc {
+			Ok(crc) => {
+				crc_buffer[0] = crc as u8;
+				crc_buffer[1] = (crc >> 8) as u8;
+
+				Status::Ok
+			},
+
+			Err(crc_status) => crc_status,
+		}
+	}
+
+	/**
 	 * Check if little endian bytes match u16.
 	 *
 	 * Used mainly for crc checks.
@@ -872,4 +899,13 @@ pub enum Status {
 	BufferShort,
 	/// Internal error in the code. Should not happen ;-)
 	Bug,
+}
+
+impl Status {
+
+	/// Returns `true` if `Status` is `Status::Ok`
+	#[inline]
+	pub fn is_ok(&self) -> bool {
+		*self == Status::Ok
+	}
 }

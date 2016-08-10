@@ -117,3 +117,41 @@ impl Type {
 		}
 	}
 }
+
+pub mod mifare {
+	//! MIFARE PICC definitions.
+
+	/// Default key on factory outlet.
+	pub const FACTORY_KEY: Key = Key([0xFF; 6]);
+
+	/// MIFARE Crypto1 Key.
+	pub struct Key([u8; 6]);
+
+	impl Default for Key {
+		#[inline]
+		fn default() -> Self {
+			Key([0; 6])
+		}
+	}
+
+	impl Key {
+		#[inline]
+		pub fn len(&self) -> usize {
+			self.0.len()
+		}
+	}
+
+	impl AsRef<[u8]> for Key {
+		#[inline]
+		fn as_ref(&self) -> &[u8] {
+			self.0.as_ref()
+		}
+	}
+
+	impl AsMut<[u8]> for Key {
+		#[inline]
+		fn as_mut(&mut self) -> &mut [u8] {
+			self.0.as_mut()
+		}
+	}
+}
