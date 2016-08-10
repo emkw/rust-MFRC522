@@ -30,7 +30,7 @@ features = ["spidev", "self_test"]
 ### Cargo.toml features:
 - `use_std` - compile without `no_std`.
 
-- `ndebug` - do not compile in fmt::Debug implementations (excluding bitflags)
+- `ndebug` - do not compile in fmt::Debug implementations.
 - `nlog` - do not comile in any logging.
 
 - `host_crc` - calculate CRC_A on host rather than on PCD.

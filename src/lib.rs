@@ -15,8 +15,6 @@
 #![cfg_attr(not(any(feature = "use_std", feature = "spidev")), no_std)]
 
 #[macro_use]
-extern crate bitflags;
-#[macro_use]
 extern crate log;
 
 #[cfg(any(feature = "use_std", feature = "spidev"))]
@@ -27,6 +25,8 @@ extern crate i2cdev;
 #[cfg(feature = "spidev")]
 extern crate spidev;
 
+#[macro_use]
+mod bitflags;
 #[macro_use]
 mod macros;
 #[macro_use]
