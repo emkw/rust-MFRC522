@@ -17,7 +17,7 @@ default = []
 ndebug = []
 
 # Skip all logging.
-nlog = [ "log/max_level_off" ]
+nlog = ["log/max_level_off"]
 
 # Compile without no_std.
 use_std = []

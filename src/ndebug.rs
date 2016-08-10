@@ -8,7 +8,7 @@
 //! When building with feature `ndebug` or `nlog` those become a no-op.
 //!
 //! Normal log macros should be used in case of logging that do not require
-//! fmt::Debug implementation.
+//! `fmt::Debug` implementation.
 
 #[cfg(not(any(feature= "nlog", feature = "ndebug")))]
 macro_rules! ninfo {

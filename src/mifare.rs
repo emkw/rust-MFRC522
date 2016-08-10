@@ -26,8 +26,8 @@ impl<'a> MFRC522<'a> {
 	 *
 	 * Parameters:
 	 * - `command` - picc::Cmd::MF_AUTH_KEY_A or picc::Cmd::MF_AUTH_KEY_B.
-	 * - `black_addr` - The block number.
-	 * - `key` - Reference to the Crypteo1 key to use (6 bytes).
+	 * - `block_addr` - The block number.
+	 * - `key` - Reference to the Crypto1 key to use (6 bytes).
 	 * - `uid` - Reference to UID struct. The first 4 bytes of the UID are used.
 	 *
 	 * Returns: Status::OK on success, Status::??? otherwise. Probably Status::Timeout if you supply the wrong key.
@@ -58,11 +58,11 @@ impl<'a> MFRC522<'a> {
 	 * For MIFARE Ultralight only addresses 00h to 0Fh are decoded.
 	 * The MF0ICU1 returns a NAK for higher addresses.
 	 * The MF0ICU1 responds to the READ command by sending 16 bytes starting from the page address defined by the command argument.
-	 * For example; if blockAddr is 03h then pages 03h, 04h, 05h, 06h are returned.
-	 * A roll-back is implemented: If blockAddr is 0Eh, then the contents of pages 0Eh, 0Fh, 00h and 01h are returned.
+	 * For example; if `block_addr` is 03h then pages 03h, 04h, 05h, 06h are returned.
+	 * A roll-back is implemented: If `block_addr` is 0Eh, then the contents of pages 0Eh, 0Fh, 00h and 01h are returned.
 	 *
 	 * The buffer must be at least 18 bytes because a CRC_A is also returned.
-	 * Checks the CRC_A before returning STATUS_OK.
+	 * Checks the CRC_A before returning Status::Ok.
 	 *
 	 * Parameters:
 	 * - `block_addr`: MIFARE Classic: The block (0-0xff) number. MIFARE Ultralight: The first page to return data from.
@@ -81,9 +81,20 @@ impl<'a> MFRC522<'a> {
 		let mut tx_buffer: [u8; 4] = [0; 4];
 		tx_buffer[0] = picc::Cmd::MF_READ as u8;
 		tx_buffer[1] = block_addr;
-		self.crc_append(&mut tx_buffer);
+		let crc_status = self.crc_append(&mut tx_buffer);
+		if !crc_status.is_ok() {
+			return (crc_status, 0);
+		}
 
 		// Transmit the buffer and receive the response, validate CRC_A.
-		self.pcd_transceive_data(tx_buffer.as_ref(), Some(rx_buffer), &mut 0, 0, false)
+		let (status, nread) = self.pcd_transceive_data(tx_buffer.as_ref(), Some(rx_buffer), &mut 0, 0, false);
+
+		// Card responded, could not read.
+		// TODO: check specifications for error codes.
+		if nread == 1 && rx_buffer[0] == 0x04 {
+			return (Status::Error, nread)
+		}
+
+		(status, nread)
 	}
 }

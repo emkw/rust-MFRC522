@@ -519,13 +519,9 @@ impl<'a> MFRC522<'a> {
 
 					// Calculate CRC_A of first 7 bytes in tx_buffer.
 					// and write them to last 2 bytes.
-					let (crc_data, crc_out) = tx_buffer.split_at_mut(7);
-					let crc = self.crc_calculate(crc_data);
-					if let Err(crc_fail) = crc {
-						return crc_fail;
-					} else if let Ok(crc) = crc {
-						crc_out[0] = crc as u8;
-						crc_out[1] = (crc >> 8) as u8;
+					let crc_status = self.crc_append(&mut tx_buffer[..9]);
+					if !crc_status.is_ok() {
+						return crc_status;
 					}
 
 					// lest bits = 0 => All 8 bits of last bit are used.
@@ -684,20 +680,14 @@ impl<'a> MFRC522<'a> {
 	pub fn picc_hlta(&mut self) -> Status {
 		let mut tx_buffer = [0; 4];
 		tx_buffer[0] = picc::Cmd::HLTA as u8;
+		// tx_buffer[1] <- 0
 
 		// Calculate CRC_A
 		// TODO: Investigate if const CRC can be used, or if it must follow the
 		//       CRC preset set in mfrc522 register.
-		{
-			let (data, crc_buffer) = tx_buffer.split_at_mut(2);
-
-			let crc = self.crc_calculate(data);
-			if let Err(crc_fail) = crc {
-				return crc_fail;
-			} else if let Ok(crc) = crc {
-				crc_buffer[0] = crc as u8;
-				crc_buffer[1] = (crc >> 8) as u8;
-			}
+		let crc_status = self.crc_append(tx_buffer.as_mut());
+		if !crc_status.is_ok() {
+			return crc_status;
 		}
 
 		// Send the command.
@@ -712,7 +702,7 @@ impl<'a> MFRC522<'a> {
 			return Status::Error;
 		}
 
-		return status;
+		status
 	}
 
 	/**
@@ -732,7 +722,7 @@ impl<'a> MFRC522<'a> {
 
 		// TODO: enable CRC check.
 		let (status, nread) = self.pcd_transceive_data(data, Some(buffer_atqa.as_mut()), &mut valid_bits, 0, false);
-		if status == Status::Ok && (nread != 2 || valid_bits != 0) {
+		if status.is_ok() && (nread != 2 || valid_bits != 0) {
 			// ATQA must be exactly 16 bits.
 			(Status::Error, ATQA::from(0))
 		} else {

@@ -8,7 +8,7 @@
 /// UID struct.
 ///
 /// UID is either 4, 7 or 10 bytes.
-#[derive(Copy,Clone)]
+#[derive(Copy,Clone,Eq,PartialEq,Hash)]
 #[cfg_attr(not(feature = "ndebug"), derive(Debug))]
 pub struct UID {
 	/// The UID
@@ -39,6 +39,11 @@ impl UID {
 	#[inline]
 	pub fn len(&self) -> u8 {
 		self.len
+	}
+
+	#[inline]
+	pub fn is_empty(&self) -> bool {
+		self.len() == 0
 	}
 
 	pub fn bits_len(&self) -> u8 {

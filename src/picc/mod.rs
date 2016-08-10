@@ -125,6 +125,8 @@ pub mod mifare {
 	pub const FACTORY_KEY: Key = Key([0xFF; 6]);
 
 	/// MIFARE Crypto1 Key.
+	#[derive(Copy,Clone,Eq,PartialEq)]
+	#[cfg_attr(not(feature = "ndebug"), derive(Debug))]
 	pub struct Key([u8; 6]);
 
 	impl Default for Key {

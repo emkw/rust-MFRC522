@@ -1,4 +1,4 @@
-/// This example needs features: spidev self_test
+/// This example needs features: spidev
 extern crate spidev;
 extern crate mfrc522;
 
@@ -50,7 +50,7 @@ fn example() -> io::Result<()> {
 			let status = mfrc522.picc_select(&mut uid);
 			println!("Select: {:?} {:?}", status, uid);
 			if status.is_ok() {
-				println!("Card UID: {:?}", uid.as_bytes());
+				println!("Card UID: {:?} | Type: {:?}", uid.as_bytes(), uid.picc_type());
 
 				if authenticate_and_read_block_zero(&mut mfrc522, &uid) {
 					let halt_status = mfrc522.picc_hlta();

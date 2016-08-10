@@ -25,7 +25,7 @@ pub type Result<T> = ::core::result::Result<T, ()>;
 ///
 /// Typically T will be usize - number of bytes read/written so far.
 ///
-/// Err may pass down as Status::BusError from MFRC522 functions.
+/// Err may pass down as `Status::BusError` from MFRC522 functions.
 pub type MultiResult<T> = ::core::result::Result<T, T>;
 
 pub trait MFRC522Bus {

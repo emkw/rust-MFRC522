@@ -10,7 +10,7 @@
 /// MFRC522 registers. Described in chapter 9 of the datasheet.
 ///
 /// When using SPI all addresses need to be shifted one bit left in the
-/// "SPI address byte" (section 8.1.2.3) - this has to be done in MFRC522Bus
+/// "SPI address byte" (section 8.1.2.3) - this has to be done in `MFRC522Bus`
 /// implementation
 #[derive(Copy,Clone)]
 #[cfg_attr(not(feature = "ndebug"), derive(Debug))]

@@ -16,8 +16,8 @@ pub mod crc {
 		data.iter()
 			.fold(CRC_PRESET, |crc, byte| {
 				let mut b = *byte;
-				b = b ^ (crc as u8);
-				b = b ^ (b << 4);
+				b ^= crc as u8;
+				b ^= b << 4;
 
 				(crc >> 8) ^ ((b as u16) << 8) ^ ((b as u16) << 3) ^ ((b as u16) >> 4)
 		})
