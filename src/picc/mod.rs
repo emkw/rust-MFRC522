@@ -156,4 +156,48 @@ pub mod mifare {
 			self.0.as_mut()
 		}
 	}
+
+	impl From<[u8; 6]> for Key {
+		#[inline]
+		fn from(bytes: [u8; 6]) -> Self {
+			Key(bytes)
+		}
+	}
+
+	/// Constructs `Key` from 48 lower bits (6 lower bytes) of `u64`.
+	impl From<u64> for Key {
+		fn from(bits: u64) -> Self {
+			let bytes = [
+				(bits >> 40) as u8,
+				(bits >> 32) as u8,
+				(bits >> 24) as u8,
+				(bits >> 16) as u8,
+				(bits >>  8) as u8,
+				bits as u8
+			];
+
+			Key::from(bytes)
+		}
+	}
+
+	#[cfg(test)]
+	mod tests {
+		use super::Key;
+
+		#[test]
+		fn test_key_from_u48() {
+			let key_bits: u64 = 0x112233445566;
+			let key = Key::from(key_bits);
+
+			assert_eq!(key.as_ref(), &[0x11, 0x22, 0x33, 0x44, 0x55, 0x66]);
+		}
+
+		#[test]
+		fn test_key_from_u64() {
+			let key_bits: u64 = 0x1122334455667788;
+			let key = Key::from(key_bits);
+
+			assert_eq!(key.as_ref(), &[0x33, 0x44, 0x55, 0x66, 0x77, 0x88]);
+		}
+	}
 }
