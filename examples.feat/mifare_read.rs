@@ -27,7 +27,7 @@ fn authenticate_and_read_block_zero(mfrc522: &mut MFRC522, uid: &UID) -> bool {
 
 	let mut buffer = [0_u8; 18];
 	let (read_status, nread) = mfrc522.mifare_read(0, &mut buffer);
-	if nread > 0 {
+	if read_status.is_ok() && nread > 0 {
 		println!("Block 0 {:?}: {:?}", read_status, &buffer[..nread]);
 	} else {
 		println!("Could not read anything from block 0: {:?}", read_status);

@@ -12,8 +12,9 @@ Any contributions are welcome.
 ## Status 
 
 Reading 4B Card UID works.
+Reading and Writing MIFARE blocks works.
 
-REQA / WUPA - OK.
+REQA / WUPA / HLTA - OK.
 SELECT - Cascade (7B, 10B UID) is probably broken, No working card to test it.
 
 i2cdev bus untested, there's a chance it may work.

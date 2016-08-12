@@ -234,6 +234,54 @@ impl<'a> MFRC522<'a> {
 	}
 
 	/**
+	 * Wrapper for MIFARE protocol communication.
+	 * Adds CRC_A, executes the Transceive command and checks that the response is MF_ACK or a timeout.
+	 *
+	 * Returns: `Status::Ok` on success, `Status::???` otherwise.
+	 */
+	pub fn pcd_mifare_transceive(&mut self, data: &[u8], timeout_is_success: bool) -> Status {
+		// Sanity check
+		if data.len() > 16 {
+			return Status::InvalidArg;
+		}
+
+		// We need room for 16 bytes data + 2 bytes CRC_A.
+		let mut cmd_buffer: [u8; 18] = [0; 18];
+		cmd_buffer[..data.len()].copy_from_slice(data);
+
+		let mut tx_buffer = &mut cmd_buffer[..data.len()+2];
+		let mut rx_buffer: [u8; 1] = [0];
+
+		let crc_status = self.crc_append(tx_buffer);
+		if !crc_status.is_ok() {
+			return crc_status;
+		}
+
+		// Transceive the data, store the reply in rx_buffer[]
+		let wait_irq = RxIRq | IdleIRq;
+		let mut valid_bits = 0;
+		let (status, nread) = self.pcd_communicate_with_picc(pcd::Cmd::Transceive, wait_irq, tx_buffer,
+		                                                     Some(rx_buffer.as_mut()), &mut valid_bits, 0, false);
+		if status == Status::Timeout && timeout_is_success {
+			return Status::Ok;
+		} else if status == Status::BufferShort {
+			// The PICC must reply with a 4 bit ACK
+			return Status::Error;
+		} else if !status.is_ok() {
+			return status;
+		}
+
+		// The PICC must reply with a 4 bit ACK
+		if nread != 1 || valid_bits != 4 {
+			return Status::Error;
+		} else if rx_buffer[0] != picc::mifare::ACK {
+			return Status::MifareNAK;
+		}
+
+		Status::Ok
+	}
+
+	/**
 	 * Executes the Transceive command.
 	 *
 	 * CRC validation can only be done if `recv` buffer is specified.
@@ -318,7 +366,7 @@ impl<'a> MFRC522<'a> {
 				return (Status::BufferShort, nread);
 			}
 			// Get received data from FIFO
-			bus!(self.register_read_to_slice(Reg::FIFOData, &mut recv[0..n], rx_align), return nread);
+			bus!(self.register_read_to_slice(Reg::FIFOData, &mut recv[..n], rx_align), return nread);
 			nread = n;
 			// RxLastBits[2:0] indicates the number of valid bits in the last received byte. If this value is 000b, the whole byte is valid.
 			*last_bits = 0x07 & bus!(self.register_read(Reg::Control), return nread);
@@ -549,11 +597,11 @@ impl<'a> MFRC522<'a> {
 				bus!(self.register_write(Reg::BitFraming, (rx_align << 4) | last_bits));
 
 				// Transmit the buffer and receive the response.
-				let (result, nread) = self.pcd_transceive_data(&tx_buffer[..tx_len], Some(rx_buffer.as_mut()), &mut last_bits, rx_align, false);
+				let (trx_status, nread) = self.pcd_transceive_data(&tx_buffer[..tx_len], Some(rx_buffer.as_mut()), &mut last_bits, rx_align, false);
 				rx_len = nread;
 
-				if result != Status::Ok && result != Status::Collision {
-					return result;
+				if trx_status != Status::Ok && trx_status != Status::Collision {
+					return trx_status;
 				} else {
 					// Copy new received UID bits to tx_buffer.
 					let rx_uid_offset = if use_cascade_tag { 1 } else { 0 };
@@ -567,7 +615,7 @@ impl<'a> MFRC522<'a> {
 						tx_buffer_idx += 1;
 					}
 
-					if result == Status::Collision { // More than one PICC in the field => collision.
+					if trx_status == Status::Collision { // More than one PICC in the field => collision.
 						// CollReg[7..0] bits are: ValuesAfterColl reserved CollPosNotValid CollPos[4:0]
 						let value_of_coll_reg = bus!(self.register_read(Reg::Coll));
 
@@ -630,8 +678,7 @@ impl<'a> MFRC522<'a> {
 			}
 
 			// Verify CRC_A
-			// do our own calculation and store the control in tx_buffer[0..2] - those bytes are not needed anymore.
-			let crc = self.crc_calculate(&rx_buffer[0..1]);
+			let crc = self.crc_calculate(&rx_buffer[..1]);
 			if let Err(crc_fail) = crc {
 				return crc_fail;
 			} else if let Ok(crc) = crc {

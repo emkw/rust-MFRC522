@@ -121,25 +121,31 @@ impl Type {
 pub mod mifare {
 	//! MIFARE PICC definitions.
 
+	/// A Mifare Crypto1 key is 6 bytes.
+	pub const KEY_LEN: usize = 6;
+
+	/// The MIFARE Classic uses a 4 bit ACK/NAK. Any other value than 0xA is NAK.
+	pub const ACK: u8 = 0xA;
+
 	/// Default key on factory outlet.
-	pub const FACTORY_KEY: Key = Key([0xFF; 6]);
+	pub const FACTORY_KEY: Key = Key([0xFF; KEY_LEN]);
 
 	/// MIFARE Crypto1 Key.
 	#[derive(Copy,Clone,Eq,PartialEq)]
 	#[cfg_attr(not(feature = "ndebug"), derive(Debug))]
-	pub struct Key([u8; 6]);
+	pub struct Key([u8; KEY_LEN]);
 
 	impl Default for Key {
 		#[inline]
 		fn default() -> Self {
-			Key([0; 6])
+			Key([0; KEY_LEN])
 		}
 	}
 
 	impl Key {
 		#[inline]
 		pub fn len(&self) -> usize {
-			self.0.len()
+			KEY_LEN
 		}
 	}
 

@@ -66,15 +66,15 @@ impl<'a> MFRC522<'a> {
 	 *
 	 * Parameters:
 	 * - `block_addr`: MIFARE Classic: The block (0-0xff) number. MIFARE Ultralight: The first page to return data from.
-	 * - `rx_buffer`: The buffer to store the data in.
+	 * - `buffer`: The buffer to store the data in. Must be at least 18 bytes, otherwise `Status::BufferShort` is returned.
 	 *
 	 * Returns: (status, number_of_bytes_read).
 	 *
      * Status is `Status::Ok` on success, `Status::???` otherwise.
 	 */
-	pub fn mifare_read(&mut self, block_addr: u8, rx_buffer: &mut [u8]) -> (Status, usize) {
+	pub fn mifare_read(&mut self, block_addr: u8, buffer: &mut [u8]) -> (Status, usize) {
 		// Sanity check
-		if rx_buffer.len() < 18 {
+		if buffer.len() < 18 {
 			return (Status::BufferShort, 0);
 		}
 		// Build command buffer
@@ -87,14 +87,59 @@ impl<'a> MFRC522<'a> {
 		}
 
 		// Transmit the buffer and receive the response, validate CRC_A.
-		let (status, nread) = self.pcd_transceive_data(tx_buffer.as_ref(), Some(rx_buffer), &mut 0, 0, false);
+		let (status, nread) = self.pcd_transceive_data(tx_buffer.as_ref(), Some(buffer), &mut 0, 0, false);
 
 		// Card responded, could not read.
 		// TODO: check specifications for error codes.
-		if nread == 1 && rx_buffer[0] == 0x04 {
+		if nread == 1 && buffer[0] == 0x04 {
 			return (Status::Error, nread)
 		}
 
 		(status, nread)
+	}
+
+	/**
+	 * Writes 16 bytes to the active PICC.
+	 *
+	 * For MIFARE Classic the sector containing the block must be authenticated before calling this function.
+	 *
+	 * For MIFARE Ultralight the operation is called "COMPATIBILITY WRITE".
+	 * Even though 16 bytes are transferred to the Ultralight PICC, only the first 4 bytes (bytes 0 to 3)
+	 * are written to the specified address. It is recommended to set the remaining bytes 04h to 0Fh to all logic 0.
+	 *
+	 * Parameters:
+	 * - `block_addr`: MIFARE Classic: The block (0-0xff) number. MIFARE Ultralight: The page (2-15) to write to.
+	 * - `data`: 16 bytes to write to the PICC. If data.len() != 16 error will be returned.
+	 *
+	 * Returns: `Status::Ok` on success, `Status::???` otherwise.
+	 **/
+	pub fn mifare_write(&mut self, block_addr: u8, data: &[u8]) -> Status {
+		// Sanity check
+		if data.len() < 16 {
+			return Status::InvalidArg;
+		}
+
+		self.mifare_modify(picc::Cmd::MF_WRITE, block_addr, data)
+	}
+
+	/**
+	 * Helper function for the two-step MIFARE Classic protocol operations write, increment, decrement, and restore.
+	 *
+	 * Returns: `Status::Ok` on success, `Status::???` otherwise.
+	 **/
+	pub fn mifare_modify(&mut self, command: picc::Cmd, block_addr: u8, data: &[u8]) -> Status {
+		// Mifare Classic protocol requires two communications to perform a write.
+		// Step 1: Tell the PICC we want to write to block block_addr.
+		let cmd_buffer: [u8; 2] = [
+			command as u8,
+			block_addr,
+		];
+		let status = self.pcd_mifare_transceive(&cmd_buffer, false); // Adds CRC_A and checks that the response is MF_ACK.
+			if !status.is_ok() {
+			return status;
+		}
+
+		// Step 2: Transfer the data
+		self.pcd_mifare_transceive(data, false) // Adds CRC_A and checks that the response is MF_ACK.
 	}
 }
